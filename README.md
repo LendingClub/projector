@@ -45,3 +45,24 @@ Projector projector = new BasicProjector(config);
 
 ## AWS
 
+Scanning an AWS region involves running something like the following:
+
+```java
+BasicProjector projector = new BasicProjector();
+
+Scanner scanner = new AWSScannerBuilder()
+  .withProjector(projector)
+  .withRegion(Regions.US_EAST_1)
+  .build(AllEntityScanner.class);
+
+scanner.scan();
+```
+
+This will:
+
+1. Use the credentials found in ```${HOME}/.aws/credentials``` 
+2. Construct an AWS client
+3. Connect to the ```US_EAST_1``` region
+4. Enumerate each entity and build a Neo4j graph model
+
+After the scanner has been constructed, it can be used indefinitely.
