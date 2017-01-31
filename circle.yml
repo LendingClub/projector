@@ -1,0 +1,25 @@
+machine:
+    java:
+        version: oraclejdk8
+    environment:
+        TERM: dumb
+
+        
+general:
+    artifacts:
+        - "build/libs"
+        - "build/docs"
+        
+        
+test:
+    override:
+        - ./gradlew clean check install
+    post:
+        - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+        - find . -type f -regex ".*/build/test-results/.*.xml" -exec cp {} $CIRCLE_TEST_REPORTS/junit/ \;
+        
+deployment:
+    bintray:
+        branch: bintray
+        commands:
+            - ./gradlew uploadArchives

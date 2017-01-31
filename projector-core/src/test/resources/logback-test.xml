@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="30 seconds">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoders are assigned the type
+        ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+        <encoder>
+            <pattern>%d [%thread] [%level] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="org.lendingclub">
+        <level value="INFO"/>
+    </logger>
+    <logger name="ch.qos.logback.core.joran.event.SaxEventRecorder">
+        <level value="NONE"/>
+    </logger>
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

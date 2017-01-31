@@ -1,0 +1,8 @@
+.classpath
+.gradle/
+.project
+.settings/
+build/
+*.class
+projector-aws/bin/
+bin/

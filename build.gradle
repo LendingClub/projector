@@ -1,0 +1,116 @@
+
+apply plugin: 'eclipse'
+apply plugin: 'java'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+}
+
+
+group 'org.lendingclub.projector'
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '3.2.1'
+}
+
+
+
+
+subprojects {
+
+
+
+    
+    apply plugin: 'java'
+    apply plugin: 'maven'
+    apply plugin: 'eclipse'
+    apply plugin: 'application'
+    
+    group 'org.lendingclub.projector'
+    version = "${PROJECTOR_VERSION}"
+    
+    mainClassName = 'org.lendingclub.projector.core.Main'
+
+    
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        jcenter()
+    }
+    
+    dependencies {
+
+        testCompile "junit:junit:${JUNIT_VERSION}"
+        testCompile "org.assertj:assertj-core:${ASSERTJ_VERSION}"
+    }
+
+    run {
+        systemProperties System.getProperties()
+    }
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+
+    task javadoc(type:Javadoc, overwrite:true) {
+        // needed because of vaadin's habit of keeping source in jars
+    }
+        
+    task javadocJar(type: Jar, dependsOn: javadoc) {
+        classifier = 'javadoc'
+        from javadoc.destinationDir
+        
+    }    
+    artifacts {
+            archives sourcesJar, javadocJar, jar    
+    }
+    
+    uploadArchives {
+        repositories {
+            
+            mavenDeployer {
+                //name = 'macgyver-bintray'
+                if (!project.hasProperty('BINRAY_USER')) {
+                    project.ext['BINTRAY_USER']=System.getenv("BINTRAY_USER")
+                }
+                if (!project.hasProperty('BINTRAY_KEY')) {
+                    project.ext['BINTRAY_KEY'] = System.getenv("BINTRAY_KEY")
+                }
+            
+           repository(id: 'macgyver-bintray', url: 'https://api.bintray.com/maven/LendingClub/OSS/projector'){
+                    authentication(userName: BINTRAY_USER, password: BINTRAY_KEY)
+                }
+                //pom.setPackaging('jar')
+                pom.project {
+                    name "${project.name}"
+                    description "${project.name}"
+                    url 'https://github.com/LendingClub/projector'
+                    licenses {
+                        license {
+                            name 'The Apache Software License, Version 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    scm {
+                        connection 'scm:git:git@github.com:LendingClub/projector.git'
+                        developerConnection 'scm:git:git@github.com:LendingClub/projector.git'
+                        url 'git@github.com:LendingClub/projector.git'
+                    }
+                    developers {
+                        developer {
+                            name 'Rob Schoening'
+                            email 'robschoening@gmail.com'
+                        }
+                    }
+                
+                }
+            }
+        }
+    }
+    
+}
+
+
+

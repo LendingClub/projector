@@ -1,0 +1,4 @@
+include   'projector-test'
+include 'projector-core'
+include 'projector-aws'
+
