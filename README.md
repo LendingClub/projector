@@ -1,4 +1,4 @@
-![alt tag](https://raw.githubusercontent.com/LendingClub/projector/master/.assets/noun_7987.png) 
+![Projector](https://raw.githubusercontent.com/LendingClub/projector/master/.assets/noun_7987_sm.png) 
 
 # projector
 
