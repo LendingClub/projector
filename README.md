@@ -31,6 +31,8 @@ The following configuration options are supported:
 | neo4j.username|  Username for authentication | N/A |
 | neo4j.password|  Password for authentication | N/A |
 
+Configuration is fairly self-explanatory:
+
 ```java
 Map<String,String> config = new HashMap<>();
 config.put("neo4j.url","https://localhost:7473");
