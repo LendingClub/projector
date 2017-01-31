@@ -12,18 +12,18 @@ It is intended to be used as a library inside of other services and tools.
 
 ## Core Configuration
 
-[Projector](https://github.com/LendingClub/projector/blob/master/projector-core/src/main/java/org/lendingclub/projector/core/Projector.java) is the cornerstone of the
+The [Projector](https://github.com/LendingClub/projector/blob/master/projector-core/src/main/java/org/lendingclub/projector/core/Projector.java) class is the cornerstone of the
 Projector project.  It exposes configuration and a REST client for interacting with Neo4j.
 
-Instantiating a Projector instance is straigtforward:
+Projector doesn't use Spring, Dagger, Guice or any other DI framework.  That is your choice.  Projector is intended to be simple and straightorward to use.
+
+To create a Projector instance that connects to Neo4j at http://localhost:7474 with no username or password:
 
 ```java
 Projector projector = new BasicProjector();
 ```
 
-By default, this will communicate with Neo4j at http://localhost:7474 with no username and password.
-
-The following configuration options are supported:
+The following configuration options can be passed through the ```Projector(Map config)``` constructor:
 
 | Property Name | Description | Default Value |
 |---------------|-------------|---------------|
@@ -31,7 +31,7 @@ The following configuration options are supported:
 | neo4j.username|  Username for authentication | N/A |
 | neo4j.password|  Password for authentication | N/A |
 
-Configuration is fairly self-explanatory:
+Usage is fairly self-explanatory:
 
 ```java
 Map<String,String> config = new HashMap<>();
