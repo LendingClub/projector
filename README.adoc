@@ -208,7 +208,7 @@ Mercator will scan UCS Manager to build relationships between:
 [source,java]
 ----
 projector.createBuilder(UCSScannerBuilder.class)
-	.withUrl("https://myserver/nuova")
+	.withUrl("https://usermanager.example.com/nuova")
 	.withUsername("myusername")
 	.withPassword("mypassword")
 	.withCertValidationEnabled(true)
