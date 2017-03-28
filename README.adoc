@@ -192,3 +192,26 @@ JenkinsScanner scanner = projector
 
 scanner.scan();
 ----
+
+== Cisco UCS
+
+Mercator will scan UCS Manager to build relationships between:
+
+* Blade Chassis
+* Blades
+* Rack Servers
+* Server Service Profiles
+* Fabric Interconnects
+* Fabric Extenders
+
+[[app-listing]]
+[source,java]
+----
+projector.createBuilder(UCSScannerBuilder.class)
+	.withUrl("https://myserver/nuova")
+	.withUsername("myusername")
+	.withPassword("mypassword")
+	.withCertValidationEnabled(true)
+	.build()
+	.scan();
+----
