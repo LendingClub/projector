@@ -1,3 +1,6 @@
+## 1.4.1 - 2017-04-02
+* Build fix to work around NeoRx bintray approval
+
 ## 1.4.0 - 2017-04-02
 * Change to NeoRx 2.x & Neo4j BOLT
 
