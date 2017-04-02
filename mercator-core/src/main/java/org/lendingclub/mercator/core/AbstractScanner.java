@@ -17,6 +17,7 @@ package org.lendingclub.mercator.core;
 
 import java.util.Map;
 
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
