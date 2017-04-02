@@ -21,12 +21,12 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 
+import org.lendingclub.neorx.NeoRxClient;
+import org.lendingclub.neorx.NeoRxClient.Builder;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
-
-import io.macgyver.neorx.rest.NeoRxClient;
-import io.macgyver.neorx.rest.NeoRxClientBuilder;
 
 public class BasicProjector implements Projector {
 
@@ -67,17 +67,21 @@ public class BasicProjector implements Projector {
 		return properties;
 	}
 
+	public BasicProjector withNeoRxClient(NeoRxClient client) {
+		this.neorx = client;
+		return this;
+	}
 	@Override
 	public NeoRxClient getNeoRxClient() {
 		if (this.neorx == null) {
-			String neo4jUrl = properties.getOrDefault("neo4j.url", "http://localhost:7474");
+			String neo4jUrl = properties.getOrDefault("neo4j.url", "bolt://localhost:7687");
 			String neo4jUsername = properties.get("neo4j.username");
 			String neo4jPassword = properties.get("neo4j.password");
 
-			NeoRxClientBuilder builder = new NeoRxClientBuilder().url(neo4jUrl);
+			Builder builder = new NeoRxClient.Builder();
 
 			if (!Strings.isNullOrEmpty(neo4jUsername)) {
-				builder = builder.credentials(neo4jUsername, neo4jPassword);
+				builder = builder.withCredentials(neo4jUsername,neo4jPassword);
 			}
 
 			this.neorx = builder.build();

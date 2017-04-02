@@ -19,13 +19,12 @@ package org.lendingclub.mercator.aws;
 import java.util.Optional;
 
 import org.lendingclub.mercator.core.ScannerContext;
+import org.lendingclub.neorx.NeoRxClient;
 
 import com.amazonaws.services.ec2.model.DescribeRegionsResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class RegionScanner extends AbstractEC2Scanner {
 

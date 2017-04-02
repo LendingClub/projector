@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import org.lendingclub.neorx.NeoRxClient;
+
 import com.amazonaws.services.rds.AmazonRDSClient;
 import com.amazonaws.services.rds.AmazonRDSClientBuilder;
 import com.amazonaws.services.rds.model.DBInstance;
@@ -30,8 +32,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class RDSInstanceScanner extends AWSScanner<AmazonRDSClient> {
 
@@ -78,7 +78,7 @@ public class RDSInstanceScanner extends AWSScanner<AmazonRDSClient> {
 				
 				String cypher = "merge (x:AwsRdsInstance {aws_arn:{aws_arn}}) set x+={props} set x.updateTs=timestamp()";
 				neoRx.execCypher(cypher, "aws_arn", rdsArn, "props",n).forEach(r->{
-					gc.MERGE_ACTION.call(r);
+					gc.MERGE_ACTION.accept(r);
 					getShadowAttributeRemover().removeTagAttributes("AwsRdsInstance", n, r);
 				});
 				

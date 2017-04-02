@@ -18,7 +18,7 @@ dependencies {
     compile "com.fasterxml.jackson.core:jackson-databind:${JACKSON_VERSION}"
     compile "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:${JACKSON_VERSION}"
     compile "com.google.guava:guava:${GUAVA_VERSION}"
-    compile "io.macgyver.neorx:neorx:${NEORX_VERSION}"
+    compile "org.lendingclub.neorx:neorx:${NEORX_VERSION}"
     testCompile "org.assertj:assertj-core:${ASSERTJ_VERSION}"
     testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
 }

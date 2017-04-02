@@ -16,8 +16,7 @@
 package org.macgyver.mercator.docker;
 
 import org.lendingclub.mercator.core.SchemaManager;
-
-import io.macgyver.neorx.rest.NeoRxClient;
+import org.lendingclub.neorx.NeoRxClient;
 
 public class DockerSchemaManager extends SchemaManager {
 

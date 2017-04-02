@@ -16,15 +16,9 @@
 
 package org.lendingclub.mercator.aws;
 
-import org.lendingclub.mercator.core.Projector;
+import org.lendingclub.neorx.NeoRxClient;
 
-import com.amazonaws.AmazonWebServiceClient;
-import com.amazonaws.regions.Region;
-import com.amazonaws.services.ec2.AmazonEC2Client;
-import com.amazonaws.services.securitytoken.AbstractAWSSecurityTokenService;
 import com.google.common.base.Preconditions;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class AccountScanner extends AbstractEC2Scanner {
 

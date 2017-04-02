@@ -57,8 +57,7 @@ public class SecurityGroupScanner extends AbstractEC2Scanner {
 				String cypher = "merge (sg:AwsSecurityGroup {aws_arn:{arn}}) set sg+={props}, sg.updateTs={now} return sg";
 
 				JsonNode xx = getNeoRxClient()
-						.execCypher(cypher, "arn", g.path(AWS_ARN_ATTRIBUTE).asText(), "props", g, "now", now).toBlocking()
-						.first();
+						.execCypher(cypher, "arn", g.path(AWS_ARN_ATTRIBUTE).asText(), "props", g, "now", now).blockingFirst();
 				getShadowAttributeRemover().removeTagAttributes("AwsSecurityGroup", g, xx);
 				gc.updateEarliestTimestamp(xx);
 				if (!vpcId.isEmpty()) {

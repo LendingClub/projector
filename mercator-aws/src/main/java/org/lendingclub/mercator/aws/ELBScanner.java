@@ -107,7 +107,7 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 
 		getNeoRxClient().execCypher(cypher, "aws_arn", elbArn, "props", n).forEach(it -> {
 			if (gc != null) {
-				gc.MERGE_ACTION.call(it);
+				gc.MERGE_ACTION.accept(it);
 			}
 		
 		});

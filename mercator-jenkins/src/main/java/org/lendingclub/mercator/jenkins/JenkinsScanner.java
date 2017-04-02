@@ -28,8 +28,6 @@
  */
 package org.lendingclub.mercator.jenkins;
 
-import io.macgyver.neorx.rest.NeoRxClient;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +35,6 @@ import java.util.Map;
 import org.jdom2.Document;
 import org.jdom2.Text;
 import org.jdom2.filter.Filters;
-import org.jdom2.output.XMLOutputter;
 import org.jdom2.xpath.XPathExpression;
 import org.jdom2.xpath.XPathFactory;
 import org.lendingclub.mercator.core.AbstractScanner;
@@ -45,7 +42,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
@@ -96,8 +92,7 @@ public class JenkinsScanner extends AbstractScanner {
 				+ "ON MATCH set c.updateTs=timestamp(),c.url={url} return c";
 
 		JsonNode n = getProjector().getNeoRxClient()
-				.execCypher(cypher, "url", url).toBlocking()
-				.first();
+				.execCypher(cypher, "url", url).blockingFirst();
 		return n;
 	}
 
@@ -111,7 +106,7 @@ public class JenkinsScanner extends AbstractScanner {
 				.execCypher(cypher, "serverUrl", masterNode.get("url").asText(),
 						"jobName", n.path("name").asText(), "url",
 						n.path("url").asText())
-				.toBlocking().first();
+			.blockingFirst();
 
 		try {
 			Document d = getJenkinsClient().getJobConfig(n.path("name").asText()).getDocument();

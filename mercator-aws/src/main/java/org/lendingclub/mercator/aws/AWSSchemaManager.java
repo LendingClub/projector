@@ -16,12 +16,9 @@
 package org.lendingclub.mercator.aws;
 
 import org.lendingclub.mercator.core.SchemaManager;
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Preconditions;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class AWSSchemaManager extends SchemaManager {
 

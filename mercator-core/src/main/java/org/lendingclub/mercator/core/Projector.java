@@ -17,7 +17,8 @@ package org.lendingclub.mercator.core;
 
 import java.util.Map;
 
-import io.macgyver.neorx.rest.NeoRxClient;
+import org.lendingclub.neorx.NeoRxClient;
+
 
 public interface Projector {
 	

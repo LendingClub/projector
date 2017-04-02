@@ -18,14 +18,13 @@ package org.lendingclub.mercator.aws;
 import java.util.List;
 import java.util.function.Predicate;
 
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class ShadowAttributeRemover {
 

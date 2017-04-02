@@ -29,30 +29,19 @@
 package org.lendingclub.mercator.aws;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
-import java.util.Scanner;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
-import org.lendingclub.mercator.core.Projector;
 import org.lendingclub.mercator.core.ScannerContext;
+import org.lendingclub.neorx.NeoRxClient;
 
-import com.amazonaws.AmazonWebServiceClient;
 import com.amazonaws.regions.Region;
-import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
 import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Instance;
-import com.amazonaws.services.lightsail.model.transform.IsVpcPeeredResultJsonUnmarshaller;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class EC2InstanceScanner extends AbstractEC2Scanner {
 
@@ -104,7 +93,7 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 			String createInstanceCypher = "merge (x:AwsEc2Instance {aws_arn:{instanceArn}}) set x+={props}, x.updateTs=timestamp() return x";
 			if (gc != null) {
 				neoRx.execCypher(createInstanceCypher, "instanceArn", instanceArn, "props", n).forEach(it -> {
-					gc.MERGE_ACTION.call(it);
+					gc.MERGE_ACTION.accept(it);
 					shadowRemover.removeTagAttributes("AwsEc2Instance", n, it);
 				
 				});

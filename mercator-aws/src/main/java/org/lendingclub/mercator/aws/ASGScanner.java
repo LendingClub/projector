@@ -67,7 +67,7 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 
 				Preconditions.checkNotNull(getNeoRxClient());
 				getNeoRxClient().execCypher(cypher, "aws_arn", asgArn, "props", n).forEach(r -> {
-					gc.MERGE_ACTION.call(r);
+					gc.MERGE_ACTION.accept(r);
 					getShadowAttributeRemover().removeTagAttributes("AwsAsg", n, r);
 				});
 				incrementEntityCount();

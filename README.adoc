@@ -47,18 +47,18 @@ $ ../gradlew run
 ----
 
 It will use the AWS credentials stored in $HOME/.aws and scan your AWS infrasturcutre.  It will connect to Neo4j at
-http://localhost:7474
+bolt://localhost:
 
 == Usage
 
 == Core Configuration
 
 The https://github.com/LendingClub/mercator/blob/master/mercator-core/src/main/java/org/lendingclub/mercator/core/Mercator.java[Mercator] class is the cornerstone of the
-Mercator project.  It exposes configuration and a REST client for interacting with Neo4j.
+Mercator project.  It exposes configuration and a client for interacting with Neo4j.
 
 Mercator doesn't use Spring, Dagger, Guice or any other DI framework.  That is your choice.  Mercator is intended to be simple and straightorward to use.
 
-To create a Mercator instance that connects to Neo4j at http://localhost:7474 with no username or password:
+To create a Mercator instance that connects to Neo4j at bolt://localhost:7687 with no username or password:
 
 [[app-listing]]
 [source,java]
@@ -74,7 +74,7 @@ The following configuration options can be passed through the ```Projector(Map c
 
 | neo4j.url     
 |  URL for connecting to Neo4j REST API 
-| http://localhost:7474 
+| bolt://localhost:7687
 
 | neo4j.username
 | Username for authentication
@@ -91,7 +91,7 @@ Usage is fairly self-explanatory:
 [source,java]
 ----
 Map<String,String> config = new HashMap<>();
-config.put("neo4j.url","https://localhost:7473");
+config.put("neo4j.url","bolt://localhost:7687);
 config.put("neo4j.username","myusername");
 config.put("neo4j.username","mypassword");
 

@@ -28,21 +28,20 @@
  */
 package org.lendingclub.mercator.aws;
 
-import java.util.function.Consumer;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 import org.lendingclub.mercator.core.ScannerContext;
 import org.lendingclub.mercator.core.ScannerContext.CleanupTask;
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import rx.functions.Action1;
 
 import com.amazonaws.regions.Region;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+
+import io.reactivex.functions.Consumer;
+
 
 public class GraphNodeGarbageCollector implements CleanupTask {
 
@@ -148,10 +147,10 @@ public class GraphNodeGarbageCollector implements CleanupTask {
 			updateEarliestTimestamp(t.path("updateTs").asLong(0));
 		}
 	};
-	public final Action1<JsonNode> MERGE_ACTION = new Action1<JsonNode>() {
+	public final Consumer<JsonNode> MERGE_ACTION = new Consumer<JsonNode>() {
 
 		@Override
-		public void call(JsonNode t) {
+		public void accept(JsonNode t) {
 			updateEarliestTimestamp(t.path("updateTs").asLong(0));
 		}
 	};
@@ -170,6 +169,7 @@ public class GraphNodeGarbageCollector implements CleanupTask {
 
 	public void cleanup(ScannerContext context) {
 
+		
 		invoke();
 
 	}

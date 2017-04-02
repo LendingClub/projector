@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.lendingclub.mercator.core.AbstractScanner;
 import org.lendingclub.mercator.core.SchemaManager;
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +45,6 @@ import com.vmware.vim25.mo.ManagedEntity;
 import com.vmware.vim25.mo.ServerConnection;
 import com.vmware.vim25.mo.ServiceInstance;
 import com.vmware.vim25.mo.VirtualMachine;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class VMWareScanner extends AbstractScanner {
 
@@ -70,8 +69,7 @@ public class VMWareScanner extends AbstractScanner {
 
 	protected JsonNode ensureController() {
 		String cypher = "merge (c:ComputeController:VMWareVCenter {id: {id}}) set c.type='vcenter' return c";
-		return getProjector().getNeoRxClient().execCypher(cypher, "id", getVCenterId()).toBlocking()
-				.first();
+		return getProjector().getNeoRxClient().execCypher(cypher, "id", getVCenterId()).blockingFirst();
 	}
 
 	
@@ -95,9 +93,7 @@ public class VMWareScanner extends AbstractScanner {
 	
 		String cypher ="merge (c:ComputeHost:VMWareHost {id:{id}}) on match set c+={p} ,c.updateTs=timestamp() ON CREATE SET c+={p}, c.updateTs=timestamp() return c";
 
-		JsonNode computeHost = getProjector().getNeoRxClient().execCypher(cypher,"id", n.path("id").asText(),"p",n).toBlocking()
-				.first();
-
+		JsonNode computeHost = getProjector().getNeoRxClient().execCypher(cypher,"id", n.path("id").asText(),"p",n).blockingFirst();
 
 	}
 
@@ -106,7 +102,7 @@ public class VMWareScanner extends AbstractScanner {
 		String cypher = "merge (c:VMWareCluster {id:{id}}) on match set c+={props} "
 				+ ",c.updateTs=timestamp() ON CREATE SET "
 				+" c+={props}, c.updateTs=timestamp() return c";
-		getProjector().getNeoRxClient().execCypher(cypher, "id",cluster.path("id").asText(),"props",cluster).toBlocking().first();
+		getProjector().getNeoRxClient().execCypher(cypher, "id",cluster.path("id").asText(),"props",cluster).blockingFirst();
 	}
 
 	protected void updateComputeInstance(ObjectNode n) {
@@ -117,7 +113,7 @@ public class VMWareScanner extends AbstractScanner {
 				+ ",c.updateTs=timestamp() ON CREATE SET "
 				+ "c+={props}, c.updateTs=timestamp() return c";
 
-		getProjector().getNeoRxClient().execCypher(cypher, "id",n.path("id").asText(),"props",n).toBlocking().first();
+		getProjector().getNeoRxClient().execCypher(cypher, "id",n.path("id").asText(),"props",n).blockingFirst();
 
 	}
 
@@ -308,7 +304,7 @@ public class VMWareScanner extends AbstractScanner {
 			updateComputeHost(n);
 
 			long now = getProjector().getNeoRxClient().execCypher("return timestamp() as ts")
-					.toBlocking().first().asLong();
+					.blockingFirst().asLong();
 
 			if (scanGuests) {
 				logger.info("scanning guests on esxi host={}",host.getName());
@@ -362,7 +358,7 @@ public class VMWareScanner extends AbstractScanner {
 
 		for (JsonNode n : getProjector().getNeoRxClient()
 				.execCypher(cypher.replace("delete r", "return r"), "id", getUniqueId(host), "ts", ts)
-				.toBlocking().toIterable()) {
+				.toList().blockingGet()) {
 			logger.info("clearing stale relationship: {}", n);
 		}
 		// end of logging section

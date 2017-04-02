@@ -24,6 +24,7 @@ import org.lendingclub.mercator.core.AbstractScanner;
 import org.lendingclub.mercator.core.Scanner;
 import org.lendingclub.mercator.core.ScannerBuilder;
 import org.lendingclub.mercator.core.SchemaManager;
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +35,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.hash.Hashing;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class UCSScanner extends AbstractScanner  {
 

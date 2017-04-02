@@ -18,18 +18,12 @@ package org.lendingclub.mercator.aws;
 
 import java.util.Optional;
 
-import org.lendingclub.mercator.core.Projector;
-import org.lendingclub.mercator.core.ScannerContext;
+import org.lendingclub.neorx.NeoRxClient;
 
-import com.amazonaws.AmazonWebServiceClient;
-import com.amazonaws.regions.Region;
-import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.DescribeVpcsResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class VPCScanner extends AbstractEC2Scanner {
 
@@ -63,7 +57,7 @@ public class VPCScanner extends AbstractEC2Scanner {
 						+ "merge (x)-[r:CONTAINS]->(y) set r.updateTs=timestamp()";
 				
 				neoRx.execCypher(cypher, "aws_arn",n.path("aws_arn").asText(), "props",n).forEach(r->{
-					gc.MERGE_ACTION.call(r);
+					gc.MERGE_ACTION.accept(r);
 					getShadowAttributeRemover().removeTagAttributes("AwsVpc", n, r);
 				});
 				neoRx.execCypher(mapToSubnetCypher, "aws_arn",n.path("aws_arn").asText(), "aws_vpcId",n.path("aws_vpcId").asText());	

@@ -68,7 +68,7 @@ public class LaunchConfigScanner extends AWSScanner<AmazonAutoScalingClient> {
 				getNeoRxClient()
 						.execCypher(cypher, "aws_arn", n.path("aws_arn").asText(), "props", n, "sg", securityGroups)
 						.forEach(r -> {
-							gc.MERGE_ACTION.call(r);
+							gc.MERGE_ACTION.accept(r);
 							getShadowAttributeRemover().removeTagAttributes("AwsLaunchConfig", n, r);
 						});
 				incrementEntityCount();

@@ -1,3 +1,6 @@
+## 1.4.0 - 2017-04-02
+* Change to NeoRx 2.x & Neo4j BOLT
+
 ## 1.3.1 - 2017-03-28
 * Changed unique identifier for docker to mercatorId
 * Added DockerManager label

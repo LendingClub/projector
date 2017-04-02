@@ -25,6 +25,7 @@ import org.lendingclub.mercator.core.MercatorException;
 import org.lendingclub.mercator.core.Projector;
 import org.lendingclub.mercator.core.ScannerContext;
 import org.lendingclub.mercator.core.SchemaManager;
+import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,8 +43,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public abstract class AWSScanner<T extends AmazonWebServiceClient> extends AbstractScanner {
 

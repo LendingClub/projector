@@ -17,18 +17,12 @@ package org.lendingclub.mercator.aws;
 
 import java.util.Optional;
 
-import org.lendingclub.mercator.core.Projector;
-import org.lendingclub.mercator.core.ScannerContext;
+import org.lendingclub.neorx.NeoRxClient;
 
-import com.amazonaws.AmazonWebServiceClient;
-import com.amazonaws.regions.Region;
-import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.DescribeSubnetsResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-
-import io.macgyver.neorx.rest.NeoRxClient;
 
 public class SubnetScanner extends AbstractEC2Scanner{
 
@@ -69,7 +63,7 @@ public class SubnetScanner extends AbstractEC2Scanner{
 				NeoRxClient client = getNeoRxClient();
 				Preconditions.checkNotNull(client);
 				client.execCypher(cypher, "aws_arn",n.get("aws_arn").asText(),"props",n).forEach(r->{
-					gc.MERGE_ACTION.call(r);
+					gc.MERGE_ACTION.accept(r);
 					getShadowAttributeRemover().removeTagAttributes("AwsSubnet", n, r);
 				});
 				incrementEntityCount();
