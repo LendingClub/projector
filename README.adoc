@@ -25,7 +25,7 @@ There is a docker image that is able to scan your AWS infrastructure.  To run it
 [[app-listing]]
 [source,bash]
 ----
-$ docker run -it -p 7474:7474 -p 7687:7687 -v ~/.aws:/root/.aws lendingclub/projector-demo
+$ docker run -it -p 7474:7474 -p 7687:7687 -v ~/.aws:/root/.aws lendingclub/mercator-demo
 ----
 
 
@@ -42,7 +42,7 @@ If you don't like the Docker approach and you can install Neo4j (not hard) and r
 [[app-listing]]
 [source,bash]
 ----
-$ cd projector-demo
+$ cd mercator-demo
 $ ../gradlew run
 ----
 
