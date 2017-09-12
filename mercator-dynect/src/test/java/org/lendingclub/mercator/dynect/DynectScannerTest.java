@@ -15,21 +15,73 @@
  */
 package org.lendingclub.mercator.dynect;
 
+import org.assertj.core.api.Assertions;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.lendingclub.mercator.core.Projector;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+
 public class DynectScannerTest {
+	
+	@Rule
+	public MockWebServer mockServer = new MockWebServer();
+	
+	DynectClient client;
+
 	
 	@Test
 	@Ignore
-	public void test() {
+	public void scanZoneRecordTest() {
 		
-		String companyName = "LendingClub";
-		String userName = "mercator";
-		String password = "test";
+		String jsonResponse = getSessionResponseJsonBody();
+		mockServer.enqueue(new MockResponse().setBody(jsonResponse));
 		
-		DynectScanner scanner = new Projector.Builder().build().createBuilder(DynectScannerBuilder.class).withProperties(companyName, userName, password).build();
-		scanner.scan();	
+		client = new DynectClient.DynBuilder().withUrl(mockServer.url("/login").toString()).withProperties("LendingClub", "mercator", "test").build();
+
+		DynectScannerBuilder dynBuilder = new DynectScannerBuilder().withProperties("LendingClub", "mercator", "test");
+		
+		DynectScanner scanner = new DynectScanner(dynBuilder);
+
+		mockServer.enqueue(new MockResponse().setBody(getRecordResponseJsonBody()));
+	
+		ObjectNode response = client.get("/REST/ARecord/Test.com/api-sandbox.Test.com/126050797");
+		ObjectNode data = scanner.toRecordJson(response.get("data"));
+		
+		Assertions.assertThat(data.get("zoneName").asText().equals("Test.com"));
+		Assertions.assertThat(data.get("address").asText().equals("0.0.0.0"));
+		Assertions.assertThat(data.get("recordName").asText().equals("api-sandbox.Test.com"));
+		Assertions.assertThat(data.get("recordType").asText().equals("A"));
+	}
+	
+	private String getSessionResponseJsonBody() {
+		String body = "{"
+		        + " \"status\": \"success\","
+		        + " \"data\": {"
+		        + " \"token\": \"9IlKZpX0ZAQzsq3kiXJCiFGJVs7EB2ZouvMcwJORo8\", "
+		        + " \"version\": \"3.7.5\" "
+		        + "  }"
+		        + "}";
+		return body;
+	}
+	
+	private String getRecordResponseJsonBody() {
+		String body = "{"
+		        + " \"status\": \"success\","
+		        + " \"data\": {"
+		        + " \"zone\": \"Test.com\", "
+		        + " \"ttl\": 300, "
+		        + " \"fqdn\": \"api-sandbox.Test.com\", "
+		        + " \"record_type\": \"A\", "
+		        + " \"rdata\": { "
+		        + " \"address\": \"0.0.0.0\" },"
+		        + " \"version\": \"3.7.5\" "
+		        + "  }"
+		        + "}";
+		return body;
 	}
 }
