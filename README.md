@@ -57,7 +57,7 @@ bolt://localhost:7687
 
 ### Core Configuration
 
-The https://github.com/LendingClub/mercator/blob/master/mercator-core/src/main/java/org/lendingclub/mercator/core/Projector.java[Projector] class is the cornerstone of the
+The [Projector](https://github.com/LendingClub/mercator/blob/master/mercator-core/src/main/java/org/lendingclub/mercator/core/Projector.java) class is the cornerstone of the
 Mercator project.  It exposes configuration and a client for interacting with Neo4j.
 
 Mercator doesn't use Spring, Dagger, Guice or any other DI framework.  That is your choice.  Mercator is intended to be simple and straightorward to use.
