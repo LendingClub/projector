@@ -1,33 +1,28 @@
-image:https://raw.githubusercontent.com/LendingClub/mercator/master/.assets/noun_773008_sm.png["Logo",
-link="https://github.com/LendingClub/mercator"]
+![Trident](https://raw.githubusercontent.com/LendingClub/mercator/master/.assets/noun_773008_sm.png) 
 
-== mercator
+# Mercator
 
-image:https://circleci.com/gh/LendingClub/mercator.svg?style=svg["CircleCI", link="https://circleci.com/gh/LendingClub/mercator"]
-image:https://api.bintray.com/packages/lendingclub/OSS/mercator/images/download.svg["Bintray",
-link="https://bintray.com/lendingclub/OSS/mercator/_latestVersion"]
+[![Circle CI](https://circleci.com/gh/LendingClub/mercator.svg?style=svg)](https://circleci.com/gh/LendingClub/mercator")
+[![Download](https://api.bintray.com/packages/lendingclub/OSS/mercator/images/download.svg)](https://bintray.com/lendingclub/OSS/mercator/_latestVersion)
 
 
 Mercator creates graph-model projections of physical, virtual and cloud infrastructure.
 
-Mercator uses https://neo4j.com/[Neo4j], a particularly awesome open-source graph database.  
+Mercator uses [Neo4j](https://neo4j.com/), a particularly awesome open-source graph database.  
 
 It is intended to be used as a library inside of other services and tools.
 
-== Quick Start
+## Quick Start
 
 There are two options for getting your feet wet with Mercator.
 
-=== Docker
+### Docker
 
-There is a docker image that is able to scan your AWS infrastructure.  To run it:
+There is a docker image that is able to scan your AWS infrastructure and generate a graph of all the related entities.  To run it:
 
-[[app-listing]]
-[source,bash]
-----
+```bash
 $ docker run -it -p 7474:7474 -p 7687:7687 -v ~/.aws:/root/.aws lendingclub/mercator-demo
-----
-
+```
 
 The container will fire up a neo4j database inside the container and then invoke Mercator against AWS.
 
@@ -35,23 +30,25 @@ In order for this to work, you need to have read-only credentials in your ~/.aws
 container with the command above, it will make your credentials available to Mercator running inside the container. 
 It will use those credentials to perform the scan of your AWS infrastructure.
 
-=== Java
+Once this is up and running, point your browser to http://localhost:7474
+
+You can then run queries against Neo4j.
+
+### Build/Run From Source
 
 If you don't like the Docker approach and you can install Neo4j (not hard) and run the same AWS demo with gradle.
 
-[[app-listing]]
-[source,bash]
-----
+```bash
 $ cd mercator-demo
 $ ../gradlew run
-----
+```
 
 It will use the AWS credentials stored in $HOME/.aws and scan your AWS infrasturcutre.  It will connect to Neo4j at
-bolt://localhost:
+bolt://localhost:7687
 
-== Usage
+## Usage
 
-== Core Configuration
+### Core Configuration
 
 The https://github.com/LendingClub/mercator/blob/master/mercator-core/src/main/java/org/lendingclub/mercator/core/Projector.java[Projector] class is the cornerstone of the
 Mercator project.  It exposes configuration and a client for interacting with Neo4j.
@@ -60,54 +57,42 @@ Mercator doesn't use Spring, Dagger, Guice or any other DI framework.  That is y
 
 To create a Projector instance that connects to Neo4j at bolt://localhost:7687 with no username or password:
 
-[[app-listing]]
-[source,java]
-----
+```java
 Projector projector = new Projector.Builder.build();
-----
+```
 
 To use a different URL:
 
-[[app-listing]]
-[source,java]
-----
+```java
 Projector projector = new Projector.Builder().withUrl("bolt://myserver:7687").build();
-----
+```
 
 To provide credentials:
 
-[[app-listing]]
-[source,java]
-----
-
+```java
 Projector p = new Projector.Builder()
     .withUrl("bolt://myserver:7687")
     .withUsername("scott")
     .withPassword("tiger")
     .build();
-----
+```
 
 If you need more control over the underlying neo4j Driver config:
 
-[[app-listing]]
-[source,java]
-----
-
+```java
 Projector p = new Projector.Builder()
     .withNeoRxConfig(cfg->{
         Driver driver = GraphDatabase.driver( "bolt://localhost:7687", AuthTokens.basic( "neo4j", "neo4j" ) );
         cfg.withDriver(driver);
     })
     .build();
-----
+```
 
-== AWS
+## AWS
 
 Scanning an AWS region involves running something like the following:
 
-[[app-listing]]
-[source,java]
-----
+```java
 Projector projector = new Projector.Builder().build();
 
 AllEntityScanner scanner = projector
@@ -115,7 +100,7 @@ AllEntityScanner scanner = projector
     .withRegion(Regions.US_WEST_2)
     .build(AllEntityScanner.class);
 scanner.scan();
-----
+```
 
 This will:
 
@@ -126,7 +111,7 @@ This will:
 
 After the scanner has been constructed, it can be used indefinitely.
 
-=== Credentials
+### Credentials
 
 A custom CredendialsProvider can be passed to the builder using `withCredentials(AWSCredentialsProvider)`.
 
@@ -134,22 +119,18 @@ As a convenience it is also possible to assume a role using the `DefaultAWSCrede
 always do this yourself.  I added it here because I tend to forget how to do it and having it in fluent 
 form during development is very useful: 
 
-[[app-listing]]
-[source,java]
-----
+```java
 new AWSScannerBuilder()
 	.withProjector(projector)
 	.withAssumeRoleCredentials("arn:aws:iam::111222333444:role/my-assumed-role", "foo")
 				.withRegion(Regions.US_WEST_2).build(ELBScanner.class).scan();
-----
+```
 
-== VMWare
+## VMWare
 
 Mercator can build a graph of VMWare entities with the following bit of code:
 
-[[app-listing]]
-[source,java]
-----
+```java
 Projector projector = new Projector.Builder().build();
 
 VMWareScanner scanner = projector.createBuilder(VMWareScannerBuilder.class)
@@ -158,55 +139,47 @@ VMWareScanner scanner = projector.createBuilder(VMWareScannerBuilder.class)
 			.withPassword("mypassword").build();
 
 scanner.scan();
-----
+```
 
-== GitHub
+## GitHub
 
 Both public GitHub and GitHub Enterprise are supported:
 
-[[app-listing]]
-[source,java]
-----
+```java
 
 GitHubScanner scanner = projector
 	.createBuilder(GitHubScannerBuilder.class)
     .withToken("oauthtoken").build();
 
 scanner.scanOrganization("Apache");
-----
+```
 
 OAuth2, Username/Password, and Anonymous access are all supported.
 
 
-== Jenkins
+## Jenkins
 
 Mercator will not only scan Jenkins, but it will create relationships to GitHub repos as well!
 
-[[app-listing]]
-[source,java]
-----
+```java
 JenkinsScanner scanner = projector
     .createBuilder(JenkinsScannerBuilder.class).withUrl("https://jenkins.example.com")
     .withUsername("myusername").withPassword("mypassword").build();
 
 scanner.scan();
-----
+```
 
-== Docker
+## Docker
 
-Mercator can talk to a Docker daemon to ingest Images and Containers.
+Mercator can talk to a Docker daemon to ingest Docker Swarm Services, Hosts, Tasks and Swarms.  
 
-[[app-listing]]
-[source,java]
-----
+```java
 projector.createBuilder(DockerScannerBuilder.class).build();
-----
+```
 
 The underlying docker client can be configured using a Consumer callback.
 
-[[app-listing]]
-[source,java]
-----
+```java
 DockerScanner ds = p.createBuilder(DockerScannerBuilder.class).withConfig(cfg->{
 	cfg.withDockerHost("tcp://my-docker-host.tld:2376")
 	.withDockerTlsVerify(true)
@@ -218,10 +191,9 @@ DockerScanner ds = p.createBuilder(DockerScannerBuilder.class).withConfig(cfg->{
 	.withRegistryPassword("ilovedocker")
 	.withRegistryEmail("dockeruser@github.com");
 	}).build();
-----
+```
 
-
-== Cisco UCS
+## Cisco UCS
 
 Mercator will scan UCS Manager to build relationships between:
 
@@ -232,9 +204,7 @@ Mercator will scan UCS Manager to build relationships between:
 * Fabric Interconnects
 * Fabric Extenders
 
-[[app-listing]]
-[source,java]
-----
+```java
 projector.createBuilder(UCSScannerBuilder.class)
 	.withUrl("https://usermanager.example.com/nuova")
 	.withUsername("myusername")
@@ -242,4 +212,4 @@ projector.createBuilder(UCSScannerBuilder.class)
 	.withCertValidationEnabled(true)
 	.build()
 	.scan();
-----
+```
