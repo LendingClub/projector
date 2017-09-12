@@ -22,5 +22,5 @@ dependencies {
     compile "io.macgyver.okrest3:okrest:${OKREST3_VERSION}"
     testCompile "org.assertj:assertj-core:${ASSERTJ_VERSION}"
     testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
-    testCompile project(':mercator-test')
+   // testCompile project(':mercator-test')
 }
