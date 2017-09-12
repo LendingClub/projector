@@ -20,7 +20,14 @@ There are two options for getting your feet wet with Mercator.
 
 There is a docker image that is able to scan your AWS infrastructure and generate a graph of all the related entities.  To run it:
 
+
 ```bash
+# Pull the latest image
+$ docker pull lendingclub/mercator-demo
+```
+
+```bash
+# Run the container
 $ docker run -it -p 7474:7474 -p 7687:7687 -v ~/.aws:/root/.aws lendingclub/mercator-demo
 ```
 
