@@ -44,6 +44,7 @@ public class Route53Scanner extends AWSScanner<AmazonRoute53Client> {
 		ListHostedZonesResult result = new ListHostedZonesResult();
 
 		do {
+			rateLimit();
 			result = getClient().listHostedZones(request);
 			for (HostedZone zone : result.getHostedZones()) {
 				scanHostedZoneById(zone.getId());
@@ -58,6 +59,7 @@ public class Route53Scanner extends AWSScanner<AmazonRoute53Client> {
 		GetHostedZoneRequest request = new GetHostedZoneRequest();
 		request.setId(id);
 
+		rateLimit();
 		GetHostedZoneResult result = getClient().getHostedZone(request);
 
 		projectHostedZoneResult(result);
@@ -133,10 +135,10 @@ public class Route53Scanner extends AWSScanner<AmazonRoute53Client> {
 		request.setHostedZoneId(hz.getId());
 		ListResourceRecordSetsResult result;
 
-		int i = 0;
 		long timestamp = System.currentTimeMillis();
 
 		do {
+			rateLimit();
 			result = getClient().listResourceRecordSets(request);
 			request.setStartRecordName(result.getNextRecordName());
 

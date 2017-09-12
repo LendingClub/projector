@@ -28,6 +28,7 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.concurrent.TimeUnit;
 
 import org.lendingclub.mercator.core.ScannerContext;
 import org.lendingclub.mercator.core.ScannerContext.CleanupTask;
@@ -38,10 +39,10 @@ import org.slf4j.LoggerFactory;
 import com.amazonaws.regions.Region;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 
 import io.reactivex.functions.Consumer;
-
 
 public class GraphNodeGarbageCollector implements CleanupTask {
 
@@ -100,12 +101,16 @@ public class GraphNodeGarbageCollector implements CleanupTask {
 		Preconditions.checkArgument(!Strings.isNullOrEmpty(account), "account not set");
 		Preconditions.checkArgument(!Strings.isNullOrEmpty(region), "region not set");
 
-		logger.info("purging all {} nodes in aws_account={} in region={} updated before {}", label, account, region,
-				ts);
+		Stopwatch stopwatch = Stopwatch.createStarted();
+		try {
+			String cypher = "match (x:" + label
+					+ " {aws_account: {account}, aws_region: {region}}) where x.updateTs<{ts} detach delete x";
+			getNeoRxClient().execCypher(cypher, "account", account, "region", region, "ts", ts);
+		} finally {
+			logger.info("purging all {} nodes in aws_account={} in region={} updated before {} - elapsed={} ms", label, account, region,
+					ts,stopwatch.stop().elapsed(TimeUnit.MILLISECONDS));
+		}
 
-		String cypher = "match (x:" + label
-				+ " {aws_account: {account}, aws_region: {region}}) where x.updateTs<{ts} detach delete x";
-		getNeoRxClient().execCypher(cypher, "account", account, "region", region, "ts", ts);
 	}
 
 	protected void invoke() {
@@ -169,13 +174,12 @@ public class GraphNodeGarbageCollector implements CleanupTask {
 
 	public void cleanup(ScannerContext context) {
 
-		
 		invoke();
 
 	}
 
 	public GraphNodeGarbageCollector bindScannerContext() {
-	
+
 		logger.info("binding GraphNodeGarbageCollector to {}", ScannerContext.getScannerContext().get());
 		ScannerContext.getScannerContext().get().addCleanupTask(this);
 		return this;

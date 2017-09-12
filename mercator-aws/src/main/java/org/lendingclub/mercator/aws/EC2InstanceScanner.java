@@ -30,7 +30,9 @@ package org.lendingclub.mercator.aws;
 
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.lendingclub.mercator.core.ScannerContext;
 import org.lendingclub.neorx.NeoRxClient;
@@ -41,13 +43,14 @@ import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Instance;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 
 public class EC2InstanceScanner extends AbstractEC2Scanner {
 
-	
 	public EC2InstanceScanner(AWSScannerBuilder builder) {
 		super(builder);
+		jsonConverter.flattenNestedObjects = true;
 	}
 
 	@Override
@@ -72,50 +75,79 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 	public String getNeo4jLabel() {
 		return "AwsEc2Instance";
 	}
+
 	private void writeInstance(Instance instance, GraphNodeGarbageCollector gc) {
-		if (instance.getState().getName().equals("terminated")) {
-			// instance is terminated
-			// we may want to take the opportunity to delete it right here
-		} else {
-			JsonNode n = convertAwsObject(instance, getRegion());
-			NeoRxClient neoRx = getNeoRxClient();
+		Stopwatch sw = Stopwatch.createStarted();
+		Stopwatch instanceMergeStopwatch = Stopwatch.createUnstarted();
+		Stopwatch amiMergeStopwatch = Stopwatch.createUnstarted();
+		Stopwatch subnetMergeStopwatch = Stopwatch.createUnstarted();
+		try {
+			if (instance.getState().getName().equals("terminated")) {
+				// instance is terminated
+				// we may want to take the opportunity to delete it right here
+			} else {
+				JsonNode n = convertAwsObject(instance, getRegion());
+				NeoRxClient neoRx = getNeoRxClient();
 
-			String subnetId = n.path("aws_subnetId").asText(null);
-			String instanceArn = n.path("aws_arn").asText(null);
-			String account = n.path(AccountScanner.ACCOUNT_ATTRIBUTE).asText(null);
-			String imageId = n.path("aws_imageId").asText(null);
+				String subnetId = n.path("aws_subnetId").asText(null);
+				String instanceArn = n.path("aws_arn").asText(null);
+				String account = n.path(AccountScanner.ACCOUNT_ATTRIBUTE).asText(null);
+				String imageId = n.path("aws_imageId").asText(null);
 
-			Preconditions.checkNotNull(neoRx);
+				Preconditions.checkNotNull(neoRx);
 
-			Preconditions.checkState(!Strings.isNullOrEmpty(instanceArn), "aws_arn must not be null");
-			Preconditions.checkState(!Strings.isNullOrEmpty(account), "aws_account must not be null");
+				Preconditions.checkState(!Strings.isNullOrEmpty(instanceArn), "aws_arn must not be null");
+				Preconditions.checkState(!Strings.isNullOrEmpty(account), "aws_account must not be null");
 
-			String createInstanceCypher = "merge (x:AwsEc2Instance {aws_arn:{instanceArn}}) set x+={props}, x.updateTs=timestamp() return x";
-			if (gc != null) {
-				neoRx.execCypher(createInstanceCypher, "instanceArn", instanceArn, "props", n).forEach(it -> {
-					gc.MERGE_ACTION.accept(it);
-					shadowRemover.removeTagAttributes("AwsEc2Instance", n, it);
-				
-				});
+				instanceMergeStopwatch.start();
+				String createInstanceCypher = "merge (x:AwsEc2Instance {aws_arn:{instanceArn}}) set x+={props}, x.updateTs=timestamp() return x";
+				if (gc != null) {
+					neoRx.execCypher(createInstanceCypher, "instanceArn", instanceArn, "props", n).forEach(it -> {
+						gc.MERGE_ACTION.accept(it);
+						shadowRemover.removeTagAttributes("AwsEc2Instance", n, it);
+					});
+				} else {
+					neoRx.execCypher(createInstanceCypher, "instanceArn", instanceArn, "props", n);
+				}
+				instanceMergeStopwatch.stop();
+
+				amiMergeStopwatch.start();
+				if (!Strings.isNullOrEmpty(imageId)) {
+					String amiArn = String.format("arn:aws:ec2:%s::image/%s", getRegion().getName(), imageId);
+
+					String mapToImageCypher = "match (x:AwsAmi {aws_arn:{amiArn}}), "
+							+ "(y:AwsEc2Instance {aws_arn:{instanceArn}}) "
+							+ "merge (y)-[r:USES]-(x) set r.updateTs=timestamp()";
+					neoRx.execCypher(mapToImageCypher, "amiArn", amiArn, "instanceArn", instanceArn);
+				}
+				amiMergeStopwatch.stop();
+
+				subnetMergeStopwatch.start();
+				if (!Strings.isNullOrEmpty(subnetId)) {
+					String subnetArn = String.format("arn:aws:ec2:%s:%s:subnet/%s", getRegion().getName(), account,
+							subnetId);
+					String mapToSubnetCypher = "match (x:AwsSubnet {aws_arn:{subnetArn}}), "
+							+ "(y:AwsEc2Instance {aws_arn:{instanceArn}}) "
+							+ "merge (y)-[r:RESIDES_IN]->(x) set r.updateTs=timestamp()";
+					neoRx.execCypher(mapToSubnetCypher, "subnetArn", subnetArn, "instanceArn", instanceArn);
+
+				}
+				subnetMergeStopwatch.stop();
+
+				LinkageHelper securityGroupLinkage = new LinkageHelper().withNeo4j(getNeoRxClient())
+						.withFromArn(instanceArn).withFromLabel("AwsEc2Instance").withLinkLabel("ATTACHED_TO")
+						.withTargetLabel("AwsSecurityGroup")
+						.withTargetValues(instance.getSecurityGroups().stream()
+								.map(sg -> createEc2Arn("security-group", sg.getGroupId()))
+								.collect(Collectors.toList()));
+				securityGroupLinkage.execute();
 			}
-
-			if (!Strings.isNullOrEmpty(imageId)) {
-				String amiArn = String.format("arn:aws:ec2:%s::image/%s", getRegion().getName(), imageId);
-
-				String mapToImageCypher = "match (x:AwsAmi {aws_arn:{amiArn}}), "
-						+ "(y:AwsEc2Instance {aws_arn:{instanceArn}}) "
-						+ "merge (y)-[r:USES]-(x) set r.updateTs=timestamp()";
-				neoRx.execCypher(mapToImageCypher, "amiArn", amiArn, "instanceArn", instanceArn);
-			}
-
-			if (!Strings.isNullOrEmpty(subnetId)) {
-				String subnetArn = String.format("arn:aws:ec2:%s:%s:subnet/%s", getRegion().getName(), account,
-						subnetId);
-				String mapToSubnetCypher = "match (x:AwsSubnet {aws_arn:{subnetArn}}), "
-						+ "(y:AwsEc2Instance {aws_arn:{instanceArn}}) "
-						+ "merge (y)-[r:RESIDES_IN]->(x) set r.updateTs=timestamp()";
-				neoRx.execCypher(mapToSubnetCypher, "subnetArn", subnetArn, "instanceArn", instanceArn);
-
+		} finally {
+			if (sw.elapsed(TimeUnit.MILLISECONDS) > 50) {
+				logger.info("writeInstance took {} ms (instance={}ms amiRelationship={}ms subnetRelationship={}ms",
+						sw.elapsed(TimeUnit.MILLISECONDS), instanceMergeStopwatch.elapsed(TimeUnit.MILLISECONDS),
+						amiMergeStopwatch.elapsed(TimeUnit.MILLISECONDS),
+						subnetMergeStopwatch.elapsed(TimeUnit.MILLISECONDS));
 			}
 		}
 	}
@@ -128,6 +160,7 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 			DescribeInstancesRequest request = new DescribeInstancesRequest().withInstanceIds(instanceId);
 
 			do {
+				rateLimit();
 				DescribeInstancesResult results = getClient().describeInstances();
 				results.getReservations().forEach(reservation -> {
 					reservation.getInstances().forEach(instance -> {
@@ -147,8 +180,7 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 	protected void doScan() {
 		GraphNodeGarbageCollector gc = new GraphNodeGarbageCollector().neo4j(getNeoRxClient()).account(getAccountId())
 				.label("AwsEc2Instance").region(getRegion().getName()).bindScannerContext();
-		
-	
+
 		forEachInstance(getRegion(), instance -> {
 
 			try {
@@ -162,19 +194,21 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 
 		});
 
-	
-	
 	}
 
 	private void forEachInstance(Region region, Consumer<Instance> consumer) {
 
+		rateLimit();
 		DescribeInstancesResult results = getClient().describeInstances(new DescribeInstancesRequest());
+
 		String token = results.getNextToken();
 		results.getReservations().forEach(reservation -> {
+			rateLimit();
 			reservation.getInstances().forEach(consumer);
 		});
 
 		while (!Strings.isNullOrEmpty(token) && !token.equals("null")) {
+			rateLimit();
 			results = getClient().describeInstances(new DescribeInstancesRequest().withNextToken(token));
 			token = results.getNextToken();
 			results.getReservations().forEach(reservation -> {
@@ -182,7 +216,5 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 			});
 		}
 	}
-
-	
 
 }

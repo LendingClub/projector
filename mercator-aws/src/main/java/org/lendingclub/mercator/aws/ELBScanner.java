@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import org.lendingclub.mercator.core.MercatorException;
 
 import com.amazonaws.regions.Region;
 import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClient;
@@ -48,13 +47,12 @@ import com.amazonaws.services.elasticloadbalancing.model.LoadBalancerDescription
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 	private static final int DESCRIBE_TAGS_MAX = 20;
 
 	public ELBScanner(AWSScannerBuilder builder) {
-		super(builder, AmazonElasticLoadBalancingClient.class,"AwsElb");
+		super(builder, AmazonElasticLoadBalancingClient.class, "AwsElb");
 
 	}
 
@@ -74,12 +72,13 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 
 		String marker = null;
 		do {
+			rateLimit();
 			DescribeLoadBalancersResult results = getClient().describeLoadBalancers(request);
 
 			marker = results.getNextMarker();
 			results.getLoadBalancerDescriptions().forEach(it -> {
 				projectElb(it, null);
-				
+
 			});
 			writeTagsToNeo4j(results, getRegion(), getClient());
 			request.setMarker(marker);
@@ -109,7 +108,7 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 			if (gc != null) {
 				gc.MERGE_ACTION.accept(it);
 			}
-		
+
 		});
 
 		mapElbRelationships(elb, elbArn, getRegion().getName());
@@ -126,12 +125,11 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 				projectElb(elb, gc);
 
 			} catch (RuntimeException e) {
-	
-				maybeThrow(e,"problem scanning ELB");
-				
+
+				maybeThrow(e, "problem scanning ELB");
+
 			}
 		});
-
 
 	}
 
@@ -139,16 +137,15 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 
 		DescribeLoadBalancersRequest request = new DescribeLoadBalancersRequest();
 
-		
 		String marker = null;
 		do {
-
+			rateLimit();
 			DescribeLoadBalancersResult results = getClient().describeLoadBalancers(request.withMarker(marker));
 			marker = results.getNextMarker();
 			results.getLoadBalancerDescriptions().forEach(consumer);
 			writeTagsToNeo4j(results, region, getClient());
 			request.setMarker(marker);
-		} while  (tokenHasNext(marker));
+		} while (tokenHasNext(marker));
 	}
 
 	protected void writeTagsToNeo4j(DescribeLoadBalancersResult results, Region region,
@@ -160,30 +157,37 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 
 			// DescribeTags takes at most 20 names at a time
 			for (int i = 0; i < loadBalancerNames.size(); i += DESCRIBE_TAGS_MAX) {
-				List<String> subsetNames = loadBalancerNames.subList(i,
-						Math.min(i + DESCRIBE_TAGS_MAX, loadBalancerNames.size()));
-				DescribeTagsResult describeTagsResult = client
-						.describeTags(new DescribeTagsRequest().withLoadBalancerNames(subsetNames));
-				describeTagsResult.getTagDescriptions().forEach(tag -> {
-					try {
-						ObjectNode n = convertAwsObject(tag, region);
-						
-						String elbArn = n.path("aws_arn").asText();
+				try {
+					List<String> subsetNames = loadBalancerNames.subList(i,
+							Math.min(i + DESCRIBE_TAGS_MAX, loadBalancerNames.size()));
+					rateLimit();
 
-						String cypher = "merge (x:AwsElb {aws_arn:{aws_arn}}) set x+={props} return x";
+					DescribeTagsResult describeTagsResult = client
+							.describeTags(new DescribeTagsRequest().withLoadBalancerNames(subsetNames));
+					describeTagsResult.getTagDescriptions().forEach(tag -> {
+						try {
+							ObjectNode n = convertAwsObject(tag, region);
 
-						Preconditions.checkNotNull(getNeoRxClient());
+							String elbArn = n.path("aws_arn").asText();
 
-						getNeoRxClient().execCypher(cypher, "aws_arn", elbArn, "props", n).forEach(r -> {
-							getShadowAttributeRemover().removeTagAttributes("AwsElb", n, r);
-						});
-						
-					} catch (RuntimeException e) {
-						maybeThrow(e,"problem scanning ELB tags");
-						
-					}
-				});
+							String cypher = "merge (x:AwsElb {aws_arn:{aws_arn}}) set x+={props} return x";
+
+							Preconditions.checkNotNull(getNeoRxClient());
+
+							getNeoRxClient().execCypher(cypher, "aws_arn", elbArn, "props", n).forEach(r -> {
+								getShadowAttributeRemover().removeTagAttributes("AwsElb", n, r);
+							});
+
+						} catch (RuntimeException e) {
+							maybeThrow(e, "problem scanning ELB tags");
+
+						}
+					});
+				} catch (RuntimeException e) {
+					maybeThrow(e, "problem scanning ELB tags");
+				}
 			}
+
 		}
 	}
 
@@ -196,7 +200,15 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 		mapElbToSubnet(subnets, elbArn, region);
 		mapElbToInstance(instances, elbArn, region);
 		addSecurityGroups(securityGroups, elbArn);
+		mapElbToSecurityGroups(lb, elbArn, region);
+	}
 
+	protected void mapElbToSecurityGroups(LoadBalancerDescription lb, String elbArn, String region) {
+		LinkageHelper linkage = new LinkageHelper().withFromLabel(getNeo4jLabel()).withFromArn(elbArn)
+				.withNeo4j(getNeoRxClient()).withTargetLabel("AwsSecurityGroup").withLinkLabel("ATTACHED_TO")
+				.withTargetValues(lb.getSecurityGroups().stream().map(sg -> createArn("ec2", "security-group", sg))
+						.collect(Collectors.toList()));
+		linkage.execute();
 	}
 
 	protected void addSecurityGroups(JsonNode securityGroups, String elbArn) {
@@ -240,4 +252,10 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 			}
 		}
 	}
+
+	@Override
+	public Optional<Double> getDefaultRateLimitPerSecond() {
+		return Optional.of(2d);
+	}
+
 }

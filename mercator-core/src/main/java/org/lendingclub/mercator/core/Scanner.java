@@ -23,4 +23,5 @@ public interface Scanner {
 	public Projector getProjector();
 	public NeoRxClient getNeoRxClient();
 	public SchemaManager getSchemaManager();
+	public void rateLimit();
 }

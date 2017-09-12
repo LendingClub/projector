@@ -15,29 +15,53 @@
  */
 package org.lendingclub.mercator.demo;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import org.lendingclub.mercator.aws.AWSScannerBuilder;
 import org.lendingclub.mercator.aws.AllEntityScanner;
 import org.lendingclub.mercator.core.BasicProjector;
 import org.lendingclub.mercator.core.Projector;
+import org.lendingclub.mercator.docker.DockerScannerBuilder;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import com.amazonaws.regions.Regions;
 
 public class Main {
 
-	
-	
 	public static void main(String [] args) {
 		SLF4JBridgeHandler.removeHandlersForRootLogger();
 		SLF4JBridgeHandler.install();
 		Projector projector = new Projector.Builder().build();
-		projector.createBuilder(AWSScannerBuilder.class).withRegion(Regions.US_EAST_1).build(AllEntityScanner.class).scan();
-		projector.createBuilder(AWSScannerBuilder.class).withRegion(Regions.US_WEST_2).build(AllEntityScanner.class).scan();
 		
-		System.out.println("");
-		System.out.println("* * * * * * *");
-		System.out.println("Point your browser to: http://localhost:7474");
+		Runnable awsTask = new Runnable() {
+			
+			public void run() {
+				projector.createBuilder(AWSScannerBuilder.class).withRegion(Regions.US_EAST_1).build(AllEntityScanner.class).scan();
+				projector.createBuilder(AWSScannerBuilder.class).withRegion(Regions.US_WEST_2).build(AllEntityScanner.class).scan();
+			}
 		
+		};
+		
+		Runnable dockerTask = new Runnable() {
+			public void run() {
+		
+		projector.createBuilder(DockerScannerBuilder.class).withLocalDockerDaemon().build().scan();
+			}
+		};
+		
+		ScheduledExecutorService exec = Executors.newScheduledThreadPool(2);
+		exec.scheduleWithFixedDelay(awsTask, 0, 1, TimeUnit.MINUTES);
+		exec.scheduleWithFixedDelay(dockerTask, 0, 10, TimeUnit.SECONDS);
+		
+
+        while (true==true)  {
+            try {
+                Thread.sleep(1000);
+            }
+            catch (Exception e) {}
+        }
 	}
 
 }

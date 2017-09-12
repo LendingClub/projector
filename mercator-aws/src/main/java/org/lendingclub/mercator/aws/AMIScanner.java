@@ -60,6 +60,7 @@ public class AMIScanner extends AbstractEC2Scanner {
 		DescribeImagesRequest req = new DescribeImagesRequest().withOwners("self");
 		DescribeImagesResult result = c.describeImages(req);
 		
+		rateLimit();
 		result.getImages().forEach(i -> { 
 			try { 
 				ObjectNode n = convertAwsObject(i, getRegion());

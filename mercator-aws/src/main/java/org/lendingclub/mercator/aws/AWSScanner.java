@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.amazonaws.AmazonWebServiceClient;
+import com.amazonaws.SdkClientException;
 import com.amazonaws.client.builder.AwsSyncClientBuilder;
 import com.amazonaws.metrics.RequestMetricCollector;
 import com.amazonaws.regions.Region;
@@ -42,7 +43,6 @@ import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.Maps;
 
 public abstract class AWSScanner<T extends AmazonWebServiceClient> extends AbstractScanner {
 
@@ -56,7 +56,7 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 	String neo4jLabel = null;
 	private ScannerMetricCollector metricCollector = new ScannerMetricCollector();
 	protected AWSScannerBuilder builder;
-	JsonConverter converter;
+	protected JsonConverter jsonConverter = new JsonConverter();
 
 	Class<? extends AmazonWebServiceClient> clientType;
 
@@ -88,6 +88,7 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 	protected void setNeo4jLabel(String label) {
 		this.neo4jLabel = label;
 	}
+
 	protected ShadowAttributeRemover getShadowAttributeRemover() {
 		return shadowRemover;
 	}
@@ -136,28 +137,26 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 	}
 
 	class AWSScannerContext extends ScannerContext {
-		
+
 		@Override
 		protected ToStringHelper toStringHelper() {
 			ToStringHelper tsh = super.toStringHelper();
-			tsh.add("region",getRegion().getName());
+			tsh.add("region", getRegion().getName());
 			try {
 				tsh.add("account", getAccountId());
-			}
-			catch (RuntimeException e) {
+			} catch (RuntimeException e) {
 				tsh.add("account", "unknown");
 			}
 			return tsh;
 		}
 
-	
 	}
 
 	public final void scan() {
 
 		List<String> x = Splitter.on(".").splitToList(getClass().getName());
-		
-		new AWSScannerContext().withName(x.get(x.size()-1)).exec(ctx -> {
+
+		new AWSScannerContext().withName(x.get(x.size() - 1)).exec(ctx -> {
 
 			try {
 
@@ -175,27 +174,26 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 	protected abstract void doScan();
 
 	public ObjectNode convertAwsObject(Object x, Region region) {
-		ObjectNode n = JsonConverter.newInstance(getAccountId(), region).toJson(x, null);
-		Optional<String> arn = computeArn(n);
-		if (arn.isPresent()) {
-			n.put(AWS_ARN_ATTRIBUTE, arn.get());
-		}
+		ObjectNode n = jsonConverter.toJson(x);
 		if (region != null) {
 			n.put(AWS_REGION_ATTRIBUTE, region.getName());
 		}
 		n.put(AWS_ACCOUNT_ATTRIBUTE, getAccountId());
+		Optional<String> arn = computeArn(n);
+		if (arn.isPresent()) {
+			n.put(AWS_ARN_ATTRIBUTE, arn.get());
+		}
 		return n;
 
 	}
 
 	public GraphNodeGarbageCollector newGarbageCollector() {
-		return new GraphNodeGarbageCollector().neo4j(getNeoRxClient()).account(getAccountId()).region(getRegion()).label(getNeo4jLabel());
+		return new GraphNodeGarbageCollector().neo4j(getNeoRxClient()).account(getAccountId()).region(getRegion())
+				.label(getNeo4jLabel());
 	}
 
 	public Optional<String> computeArn(JsonNode n) {
-
 		return Optional.empty();
-
 	}
 
 	@Override
@@ -223,15 +221,35 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 		return (!Strings.isNullOrEmpty(token)) && (!token.equals("null"));
 
 	}
-	
+
 	public String getNeo4jLabel() {
-		Preconditions.checkState(neo4jLabel!=null);
+		Preconditions.checkState(neo4jLabel != null);
 		return neo4jLabel;
 	}
-	
+
 	protected void incrementEntityCount() {
 		ScannerContext.getScannerContext().ifPresent(sc -> {
 			sc.incrementEntityCount();
 		});
 	}
+
+	protected String createArn(String service, String entityType, String entityIdentifier) {
+		return "arn:aws:" + service + ":" + getRegion().getName() + ":" + getAccountId() + ":" + entityType + "/"
+				+ entityIdentifier;
+	}
+
+	@Override
+	public boolean shouldLogStackTrace(Throwable t) {
+		try {
+			if (t != null && t instanceof SdkClientException && Strings.nullToEmpty(t.getMessage())
+					.contains("Unable to load AWS credentials from any provider in the chain")) {
+				return false;
+			}
+			return super.shouldLogStackTrace(t);
+		} catch (Exception e) {
+			logger.error("programming logic error", e);
+		}
+		return true;
+	}
+
 }

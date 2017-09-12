@@ -18,16 +18,11 @@ package org.lendingclub.mercator.aws;
 import java.util.List;
 import java.util.Optional;
 
-import org.lendingclub.mercator.core.ScannerContext;
-
-import com.amazonaws.services.rds.AmazonRDSClient;
-import com.amazonaws.services.rds.AmazonRDSClientBuilder;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.Bucket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Strings;
 
 public class S3BucketScanner extends AWSScanner<AmazonS3Client> {
 
@@ -45,7 +40,7 @@ public class S3BucketScanner extends AWSScanner<AmazonS3Client> {
 	protected void doScan() {
 		AmazonS3Client client = getClient();
 		
-		
+		rateLimit();
 		List<Bucket> bucketList = client.listBuckets();
 		
 		for (Bucket bucket: bucketList) {

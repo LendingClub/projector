@@ -14,8 +14,8 @@ repositories {
 dependencies {
 
 	compile project(':mercator-core')
-    compile 'com.github.docker-java:docker-java:3.0.8'
-
+    compile 'com.github.docker-java:docker-java:3.0.13'
+    
     testCompile project(':mercator-test')
     testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
     testCompile 'org.mockito:mockito-core:2.7.0'

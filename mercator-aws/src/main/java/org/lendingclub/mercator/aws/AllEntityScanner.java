@@ -25,10 +25,13 @@ public class AllEntityScanner extends AWSScannerGroup {
 		addScannerType(AvailabilityZoneScanner.class);
 		
 		addScannerType(SubnetScanner.class);
+		addScannerType(RouteTableScanner.class);
+		addScannerType(VPCEndpointScanner.class);
 		addScannerType(VPCScanner.class);
 		addScannerType(SecurityGroupScanner.class);
 		addScannerType(AMIScanner.class);
 		addScannerType(EC2InstanceScanner.class);
+		addScannerType(NetworkInterfaceScanner.class);
 		addScannerType(ELBScanner.class);
 		addScannerType(LaunchConfigScanner.class);
 		addScannerType(ASGScanner.class);
