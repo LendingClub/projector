@@ -51,7 +51,7 @@ assemble.doLast() {
     tasks.dockerBuild.execute()
 }
 mainClassName = 'org.lendingclub.mercator.demo.Main'
-
+uploadArchives.enabled = false
 test {
     testLogging {
         // Make sure output from
