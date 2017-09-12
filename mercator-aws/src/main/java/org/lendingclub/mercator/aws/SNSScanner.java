@@ -17,8 +17,6 @@ package org.lendingclub.mercator.aws;
 
 import java.util.List;
 
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClient;
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.sns.AmazonSNSClient;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
@@ -32,7 +30,7 @@ import com.google.common.base.Strings;
 public class SNSScanner extends AWSScanner<AmazonSNSClient> {
 
 	public SNSScanner(AWSScannerBuilder builder) {
-		super(builder, AmazonSNSClient.class,"AwsSnsTopic");
+		super(builder, AmazonSNSClient.class, "AwsSnsTopic");
 
 	}
 
@@ -44,22 +42,21 @@ public class SNSScanner extends AWSScanner<AmazonSNSClient> {
 	@Override
 	protected void doScan() {
 
-
-			ListTopicsResult result = getClient().listTopics();
-			String token = null;
-			do {
-				token = result.getNextToken();
-				for (Topic topic : result.getTopics()) {
-					try {
-						projectTopic(topic);
-						scanSubscriptions(topic);
-					} catch (RuntimeException e) {
-						maybeThrow(e);
-					}
+		rateLimit();
+		ListTopicsResult result = getClient().listTopics();
+		String token = null;
+		do {
+			token = result.getNextToken();
+			for (Topic topic : result.getTopics()) {
+				try {
+					projectTopic(topic);
+					scanSubscriptions(topic);
+				} catch (RuntimeException e) {
+					maybeThrow(e);
 				}
-				result = getClient().listTopics(token);
-			} while (tokenHasNext(token));
-	
+			}
+			result = getClient().listTopics(token);
+		} while (tokenHasNext(token));
 
 	}
 
@@ -89,6 +86,7 @@ public class SNSScanner extends AWSScanner<AmazonSNSClient> {
 		ListSubscriptionsByTopicResult result = getClient().listSubscriptionsByTopic(topic.getTopicArn());
 		String token = null;
 		do {
+			rateLimit();
 			token = result.getNextToken();
 			for (Subscription subscription : result.getSubscriptions()) {
 				projectSubscription(topic, subscription);

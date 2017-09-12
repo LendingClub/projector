@@ -16,14 +16,17 @@
 package org.lendingclub.mercator.core;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.lendingclub.neorx.NeoRxClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Maps;
-
+import com.google.common.util.concurrent.RateLimiter;
 
 public abstract class AbstractScanner implements Scanner {
 
@@ -31,20 +34,38 @@ public abstract class AbstractScanner implements Scanner {
 
 	ScannerBuilder<? extends Scanner> builder;
 
-	
+	protected RateLimiter rateLimiter = null;
+
 	public AbstractScanner(ScannerBuilder<? extends Scanner> builder) {
 		this.builder = builder;
-	
+
 		Preconditions.checkNotNull(builder, "builder cannot be null");
 		Preconditions.checkNotNull(builder.getProjector(), "builder.getProjector() cannot be null");
-		
+
+		double rateLimit = -1;
+		if (builder.getRateLimitPerSecond().isPresent() == false) {
+			// If the rate limit was not explicitly set. That is, if the caller
+			// did not request a specific limit or "no limit",
+			// set it to the Scanner-specific default or "no-limit"
+			rateLimit = getDefaultRateLimitPerSecond().orElse(-1.0d);
+		} else {
+			// rate limit was explicitly set in the builder
+			rateLimit = builder.getRateLimitPerSecond().orElse(-1d);
+		}
+
+		if (rateLimit > 0) {
+			logger.info("rate limit {} calls/second", rateLimit);
+			this.rateLimiter = RateLimiter.create(rateLimit);
+		} else {
+			logger.info("rate limit {} calls/second", "unlimited");
+			this.rateLimiter = null;
+		}
 
 	}
 
 	protected ScannerBuilder<? extends Scanner> getBuilder() {
 		return this.builder;
 	}
-
 
 	@Override
 	public Projector getProjector() {
@@ -70,10 +91,18 @@ public abstract class AbstractScanner implements Scanner {
 				throw new MercatorException(e);
 			}
 		} else {
-			logger.warn(message, e);
+			if (shouldLogStackTrace(e)) {
+				logger.warn(message, e);
+			}
+			else {
+				logger.warn(message+" - "+e.toString());
+			}
+			
 		}
 	}
-
+	public boolean shouldLogStackTrace(Throwable t) {
+		return true;
+	}
 	public void maybeThrow(Exception e) {
 		maybeThrow(e, "scanning problem");
 
@@ -83,4 +112,23 @@ public abstract class AbstractScanner implements Scanner {
 		return new SchemaManager(getProjector().getNeoRxClient());
 	}
 
+	@Override
+	public void rateLimit() {
+
+		if (rateLimiter != null) {
+			Stopwatch sw = Stopwatch.createStarted();
+			rateLimiter.acquire();
+			sw.stop();
+			long ms = sw.elapsed(TimeUnit.MILLISECONDS);
+			if (ms > 50) {
+				logger.info("rate limiting paused execution for {} ms",ms);
+			}
+
+		}
+
+	}
+
+	public java.util.Optional<Double> getDefaultRateLimitPerSecond() {
+		return Optional.empty();
+	}
 }

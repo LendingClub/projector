@@ -101,12 +101,14 @@ public class RDSInstanceScanner extends AWSScanner<AmazonRDSClient> {
 	
 	private void forEachInstance(Consumer<DBInstance> consumer) { 
 
+		rateLimit();
 		DescribeDBInstancesResult result = getClient().describeDBInstances();
 		String marker = result.getMarker();
 
 		result.getDBInstances().forEach(consumer);
 		
 		while (tokenHasNext(marker)) { 
+			rateLimit();
 			result = getClient().describeDBInstances().withMarker(marker);
 			marker = result.getMarker();
 			result.getDBInstances().forEach(consumer);

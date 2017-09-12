@@ -25,7 +25,7 @@ public class DynectScannerTest {
 	@Ignore
 	public void test() {
 		
-		String companyName = "LendingClub";
+		String companyName = "Example";
 		String userName = "mercator";
 		String password = "test";
 		

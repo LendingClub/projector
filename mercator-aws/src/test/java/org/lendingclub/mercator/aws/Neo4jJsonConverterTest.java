@@ -19,47 +19,59 @@ import java.io.IOException;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
-import org.lendingclub.mercator.aws.ArnGenerator;
-import org.lendingclub.mercator.aws.JsonConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.NetworkInterface;
+import com.amazonaws.services.ec2.model.NetworkInterfaceAssociation;
+import com.amazonaws.services.ec2.model.NetworkInterfaceAttachment;
 import com.amazonaws.services.ec2.model.Tag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Lists;
 
-public class Neo4jJsonConverterTest  {
+public class Neo4jJsonConverterTest {
 
 	Logger logger = LoggerFactory.getLogger(JsonConverter.class);
 	ObjectMapper mapper = new ObjectMapper();
-	
-	JsonConverter converter;
-	ArnGenerator arnGenerator;
-	
-	protected void setup(String account, Regions region) {
-		converter = JsonConverter.newInstance(account, region);
-		arnGenerator = ArnGenerator.newInstance(account, region);
-	}
+
 	@Test
 	public void testEc2Instance() throws IOException {
-		setup("12345",Regions.US_WEST_2);
+
 		Instance instance = new Instance();
 		instance.setInstanceId("i-123456");
-		
-		
-		instance.setTags(Lists.newArrayList(new Tag("foo", "bar"),new Tag("fizz","buzz")));
-		JsonNode n = converter.toJson(instance,arnGenerator.createEc2InstanceArn(instance.getInstanceId()));
-		
+		instance.setTags(Lists.newArrayList(new Tag("foo", "bar"), new Tag("fizz", "buzz")));
+
+		JsonNode n = new JsonConverter().toJson(instance);
 		Assertions.assertThat(n.path("aws_instanceId").asText()).isEqualTo("i-123456");
-		Assertions.assertThat(n.path("aws_arn").asText()).isEqualTo("arn:aws:ec2:us-west-2:12345:instance/i-123456");
-		Assertions.assertThat(n.path("aws_region").asText()).isEqualTo("us-west-2");
-		Assertions.assertThat(n.path("aws_account").asText()).isEqualTo("12345");
 		Assertions.assertThat(n.path("aws_tag_foo").asText()).isEqualTo("bar");
 		Assertions.assertThat(n.path("aws_tag_fizz").asText()).isEqualTo("buzz");
-		logger.info("{}",mapper.writerWithDefaultPrettyPrinter().writeValueAsString(n));
+		logger.info("{}", mapper.writerWithDefaultPrettyPrinter().writeValueAsString(n));
+	}
+
+	@Test
+	public void testNetworkInterface() throws IOException {
+		NetworkInterface intf = new NetworkInterface()
+				.withAttachment(new NetworkInterfaceAttachment().withAttachmentId("eni-attach-1"))
+				.withAssociation(new NetworkInterfaceAssociation().withPublicIp("8.8.8.8"))
+				.withNetworkInterfaceId("eni-1").withPrivateIpAddress("192.168.1.1");
+		ObjectNode n = new JsonConverter().withFlattenNestedObjects(true).toJson(intf);
+		Assertions.assertThat(n.path("aws_attachment_attachmentId").asText()).isEqualTo("eni-attach-1");
+		Assertions.assertThat(n.path("aws_association_publicIp").asText()).isEqualTo("8.8.8.8");
+		Assertions.assertThat(n.path("aws_networkInterfaceId").asText()).isEqualTo("eni-1");
+		logger.info("{}", mapper.writerWithDefaultPrettyPrinter().writeValueAsString(n));
+	}
+
+	@Test
+	public void testArnGenerator() {
+		ArnGenerator arnGenerator = ArnGenerator.newInstance("12345", Regions.US_WEST_2);
+
+		Assertions.assertThat(arnGenerator.createEc2InstanceArn("i-123456"))
+				.isEqualTo("arn:aws:ec2:us-west-2:12345:instance/i-123456");
+
 	}
 
 }

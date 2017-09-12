@@ -42,6 +42,7 @@ public class SecurityGroupScanner extends AbstractEC2Scanner {
 	@Override
 	protected void doScan() {
 
+		rateLimit();
 		DescribeSecurityGroupsResult result = getClient().describeSecurityGroups();
 
 		long now = System.currentTimeMillis();

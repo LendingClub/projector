@@ -15,11 +15,13 @@
  */
 package org.lendingclub.mercator.core;
 
+import java.util.Optional;
+
 public abstract class ScannerBuilder<T> {
 
 	Projector projector;
 	boolean failOnError = false;
-	
+	Double rateLimitPerSec=null;
 	public void setProjector(Projector p) {
 		this.projector = p;
 	}
@@ -32,6 +34,14 @@ public abstract class ScannerBuilder<T> {
 	}	
 	public boolean isFailOnError() {
 		return failOnError;
+	}
+	
+	public Optional<Double> getRateLimitPerSecond() {
+		return java.util.Optional.ofNullable(rateLimitPerSec);
+	}
+	public <X extends ScannerBuilder<T>> X withRateLimitPerSecond(double c) {
+		this.rateLimitPerSec = c;
+		return (X) this;
 	}
 	public abstract T build();
 }

@@ -156,9 +156,19 @@ public class UCSClient {
 				
 				Document document = saxBuilder.build(new StringReader(val));
 				logDebug("auth result", document.getRootElement());
+
+				//temporarily logging this to check what's going wrong in prod
+				logInfo("auth result", document.getRootElement());
+
 				Token token = new Token();
 				token.value = document.getRootElement().getAttributeValue("outCookie");
-				token.refreshPeriod = Integer.parseInt(document.getRootElement().getAttributeValue("outRefreshPeriod"));
+				token.refreshPeriod = 300;
+				try {
+					token.refreshPeriod = Integer.parseInt(document.getRootElement().getAttributeValue("outRefreshPeriod"));
+				}
+				catch(Exception e) {
+
+				}
 				if (Strings.isNullOrEmpty(token.value)) {
 					throw new UCSException("Authentication failed");
 				}
@@ -224,6 +234,23 @@ public class UCSClient {
 			}
 			logger.debug(message + "\n{}", out.outputString(element));
 		}
+	}
+
+	public void logInfo(String message, Element element) {
+
+		XMLOutputter out = new XMLOutputter();
+
+		out.setFormat(Format.getPrettyFormat());
+
+		element = element.clone();
+		if (!Strings.isNullOrEmpty(element.getAttributeValue("outCookie"))) {
+			element.setAttribute("outCookie", "**********");
+		}
+		if (!Strings.isNullOrEmpty(element.getAttributeValue("cookie"))) {
+			element.setAttribute("cookie", "**********");
+		}
+		logger.info(message + "\n{}", out.outputString(element));
+
 	}
 
 	public List<Element> resolveClass(String classId, boolean inHierarchical) {

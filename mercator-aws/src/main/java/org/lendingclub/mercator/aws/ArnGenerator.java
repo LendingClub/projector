@@ -15,12 +15,8 @@
  */
 package org.lendingclub.mercator.aws;
 
-import java.util.Optional;
-
 import com.amazonaws.regions.Region;
-import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.regions.Regions;
-import com.google.common.base.Preconditions;
 
 public class ArnGenerator {
 

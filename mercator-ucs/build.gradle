@@ -12,13 +12,15 @@ repositories {
 
 // In this section you declare the dependencies for your production and test code
 dependencies {
-
+    
 	compile project(':mercator-core')
 	compile "io.macgyver.okrest3:okrest:${OKREST3_VERSION}"
 	compile "org.jdom:jdom2:${JDOM_VERSION}"
+    testCompile "com.squareup.okhttp3:mockwebserver:${OKHTTP_VERSION}"
     testCompile project(':mercator-test')
     testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
     testCompile 'org.mockito:mockito-core:2.7.0'
+    
 }
 
 

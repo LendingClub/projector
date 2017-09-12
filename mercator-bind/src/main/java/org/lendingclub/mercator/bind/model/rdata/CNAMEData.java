@@ -13,23 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.lendingclub.mercator.docker;
+package org.lendingclub.mercator.bind.model.rdata;
 
-import org.junit.Assume;
 
-public class DockerIntegrationTest {
+import java.util.HashMap;
 
-	DockerClientSupplier getLocalDaemonClientSupplier() {
-		try {
-			DockerClientSupplier supplier = new DockerClientSupplier.Builder().withLocalEngine().build();
+import com.google.common.base.Preconditions;
 
-			supplier.get().infoCmd().exec();
+public final class CNAMEData extends HashMap<String, Object> {
 
-			return supplier;
-		} catch (Exception e) {
-			Assume.assumeTrue(false);
-		}
-		
-		throw new IllegalStateException();
-	}
+	  private static final long serialVersionUID = 1L;
+	
+	  public CNAMEData(String cname) {
+	    put("cname", Preconditions.checkNotNull(cname, "cname"));
+	  }
+	
+	  public static CNAMEData create(String cname) {
+	    return new CNAMEData(cname);
+	  }
+	
+	  public String cname() {
+	    return get("cname").toString();
+	  }
 }
