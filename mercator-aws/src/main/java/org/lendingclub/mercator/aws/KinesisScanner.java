@@ -15,30 +15,13 @@
  */
 package org.lendingclub.mercator.aws;
 
-import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
-import com.amazonaws.services.dynamodbv2.model.DescribeStreamResult;
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClient;
-import com.amazonaws.services.elasticloadbalancing.AmazonElasticLoadBalancingClientBuilder;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
 import com.amazonaws.services.kinesis.model.ListStreamsResult;
 import com.amazonaws.services.kinesis.model.StreamDescription;
-import com.amazonaws.services.sns.AmazonSNSClient;
-import com.amazonaws.services.sns.AmazonSNSClientBuilder;
-import com.amazonaws.services.sns.model.ListSubscriptionsByTopicResult;
-import com.amazonaws.services.sns.model.ListTopicsResult;
-import com.amazonaws.services.sns.model.Subscription;
-import com.amazonaws.services.sns.model.Topic;
-import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
-import com.amazonaws.services.sqs.model.GetQueueAttributesResult;
-import com.amazonaws.services.sqs.model.ListQueuesResult;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Splitter;
-import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 
 public class KinesisScanner extends AWSScanner<AmazonKinesisClient> {
 
@@ -70,6 +53,7 @@ public class KinesisScanner extends AWSScanner<AmazonKinesisClient> {
 	}
 
 	private void scanStream(String name) {
+		rateLimit();
 		com.amazonaws.services.kinesis.model.DescribeStreamResult result = getClient().describeStream(name);
 		StreamDescription description = result.getStreamDescription();
 		
@@ -99,6 +83,12 @@ public class KinesisScanner extends AWSScanner<AmazonKinesisClient> {
 
 		getNeoRxClient().execCypher(cypher, "account", getAccountId());
 
+	}
+
+	@Override
+	public Optional<Double> getDefaultRateLimitPerSecond() {
+		// kinesis describe operations are heavily rate limited on the AWS side
+		return Optional.of(1d);
 	}
 
 

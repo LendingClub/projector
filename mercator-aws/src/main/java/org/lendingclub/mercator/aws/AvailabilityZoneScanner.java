@@ -45,6 +45,7 @@ public class AvailabilityZoneScanner extends AbstractEC2Scanner{
 		
 
 		GraphNodeGarbageCollector gc = newGarbageCollector().bindScannerContext();
+		rateLimit();
 		DescribeAvailabilityZonesResult result = getClient().describeAvailabilityZones();
 		result.getAvailabilityZones().forEach(it -> {
 			

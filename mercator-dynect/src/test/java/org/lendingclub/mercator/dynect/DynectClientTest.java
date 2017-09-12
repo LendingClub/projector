@@ -26,7 +26,7 @@ public class DynectClientTest {
 	@Ignore
 	public void test() {
 		
-		client = new DynectClient.DynBuilder().withProperties("LendingClub", "mercator", "test").build();
+		client = new DynectClient.DynBuilder().withProperties("Example", "mercator", "test").build();
 		client.get("Zone");
 
 	}

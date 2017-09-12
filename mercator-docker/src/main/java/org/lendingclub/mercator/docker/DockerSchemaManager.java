@@ -27,12 +27,16 @@ public class DockerSchemaManager extends SchemaManager {
 
 	@Override
 	public void applyConstraints() {
-		applyConstraint("CREATE CONSTRAINT ON (a:DockerImage) assert a.mercatorId IS UNIQUE ");
+
+		applyConstraint("CREATE CONSTRAINT ON (a:DockerHost) assert a.swarmNodeId IS UNIQUE ");
+		applyConstraint("CREATE CONSTRAINT ON (a:DockerHost) assert a.engineId IS UNIQUE ");
+		applyConstraint("CREATE CONSTRAINT ON (a:DockerSwarm) assert a.tridentClusterId IS UNIQUE ");
+		applyConstraint("CREATE CONSTRAINT ON (a:DockerSwarm) assert a.swarmClusterId IS UNIQUE ");
+		applyConstraint("CREATE CONSTRAINT ON (a:DockerSwarm) assert a.name IS UNIQUE ");
+
 		
-		applyConstraint("CREATE CONSTRAINT ON (a:DockerContainer) assert a.mercatorId IS UNIQUE ");
-		applyConstraint("CREATE CONSTRAINT ON (a:DockerHost) assert a.mercatorId IS UNIQUE ");
-		applyConstraint("CREATE CONSTRAINT ON (a:DockerHost) assert a.nodeId IS UNIQUE ");
-		applyConstraint("CREATE CONSTRAINT ON (a:DockerSwarm) assert a.mercatorId IS UNIQUE ");
+		applyUniqueConstraint("DockerService", "serviceId");
+		applyUniqueConstraint("DockerTask","taskId");
 	}
 
 }

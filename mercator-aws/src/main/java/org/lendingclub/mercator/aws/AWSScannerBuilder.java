@@ -50,6 +50,13 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 		
 	}
 
+	@Override
+	public AWSScannerBuilder  withRateLimitPerSecond(double c) {
+		// TODO Auto-generated method stub
+		return (AWSScannerBuilder) super.withRateLimitPerSecond(c);
+	}
+
+
 	AWSCredentialsProvider getCredentialsProvider() {
 		if (credentialsProvide==null) {
 			return new DefaultAWSCredentialsProviderChain();
@@ -225,7 +232,13 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 
 	@Override
 	public AWSScannerBuilder withFailOnError(boolean b) {
+		// this aids fluency by setting the correct return type
 		return super.withFailOnError(b);
+	}
+	
+	public AWSScannerBuilder withClientConfiguration(ClientConfiguration clientConfiguration) {
+		this.clientConfiguration = clientConfiguration;
+		return this;
 	}
 	
 }

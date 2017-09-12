@@ -30,12 +30,15 @@ import java.util.stream.Stream;
 
 import org.lendingclub.mercator.core.MercatorException;
 import org.lendingclub.mercator.core.ScannerBuilder;
+import org.neo4j.driver.v1.Config.ConfigBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DefaultDockerClientConfig;
+import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.DefaultDockerClientConfig.Builder;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -47,112 +50,41 @@ public class DockerScannerBuilder extends ScannerBuilder<DockerScanner> {
 
 	String LOCAL_DOCKER_DAEMON = "unix:///var/run/docker.sock";
 
+	DockerClient dockerClient;
+	Builder configBuilder = DefaultDockerClientConfig.createDefaultConfigBuilder();
+	
+	
 	@Override
 	public DockerScanner build() {
+		if (dockerClient==null) {
+			DefaultDockerClientConfig cc = configBuilder.build();
+			this.dockerClient  = DockerClientBuilder.getInstance(cc).build();
+		}
 		return new DockerScanner(this);
 	}
 
-	String managerId;
-
-	List<Consumer<Builder>> configList = Lists.newArrayList();
-
-	DockerClientSupplier.Builder dockerClientSupplierBuilder = new DockerClientSupplier.Builder();
+	
+	
 
 	public DockerScannerBuilder() {
-
+		DefaultDockerClientConfig.createDefaultConfigBuilder();
 	}
 
+	public DockerClient getDockerClient() {
+		return dockerClient;
+	}
+	public DockerScannerBuilder withDockerClient(DockerClient c) {
+		this.dockerClient = c;
+		return this;
+	}
+	public DockerScannerBuilder withConfig(Consumer<Builder> b) {
+		b.accept(configBuilder);
+		return this;
+	}
 	public DockerScannerBuilder withLocalDockerDaemon() {
-		return withDockerHost(LOCAL_DOCKER_DAEMON);
-	}
-
-	public DockerScannerBuilder withDockerHost(String host) {
-
-		return withDockerClientSupplierConfig(cfg -> {
-			cfg.withDockerHost(host);
-		});
-
-	}
-
-	public DockerScannerBuilder withName(String name) {
-		return withDockerClientSupplierConfig(cfg -> {
-			cfg.withName(name);
-		});
-
-	}
-
-	public DockerScannerBuilder withDockerClientSupplierBuilder(DockerClientSupplier.Builder b) {
-		this.dockerClientSupplierBuilder = b;
-		return this;
-	}
-	public DockerScannerBuilder withDockerClientSupplierConfig(Consumer<DockerClientSupplier.Builder> b) {
-		b.accept(dockerClientSupplierBuilder);
-
+		configBuilder.withDockerHost(LOCAL_DOCKER_DAEMON);
 		return this;
 	}
 
-	public DockerScannerBuilder withDockerConfigDir(String file) {
-		return withDockerConfigDir(new File(file));
-	}
-	public DockerScannerBuilder withDockerConfigDir(File f) {
-		return withDockerClientSupplierConfig(cfg -> {
-			cfg.withDockerConfigDir(f);
-		});
-	}
 
-	public static List<JsonNode> loadDockerConfig(File dir, boolean recursive) {
-
-		List<JsonNode> list = Lists.newArrayList();
-		if (recursive) {
-
-			if (dir == null || !dir.isDirectory()) {
-				return list;
-			}
-
-			try (Stream<Path> ds = Files.walk(dir.toPath())) {
-
-				ds.forEach(it -> {
-					Optional<JsonNode> cfg = loadDockerConfig(it.toFile());
-					if (cfg.isPresent()) {
-						list.add(cfg.get());
-					}
-
-				});
-			} catch (IOException e) {
-				logger.warn("problem", e);
-			}
-
-		}
-		return list;
-	}
-
-	public static Optional<JsonNode> loadDockerConfig(File dir) {
-
-		Map<String, String> map = Maps.newHashMap();
-		Pattern p = Pattern.compile("^\\s*export\\s*(.*)=(.*)\\s*");
-		if (dir != null && dir.isDirectory()) {
-			try {
-				File envFile = new File(dir, "env.sh");
-				if (envFile.isFile()) {
-					Files.readAllLines(new File(dir, "env.sh").toPath()).forEach(line -> {
-						Matcher m = p.matcher(line);
-						if (m.matches()) {
-							String key = m.group(1);
-							String val = m.group(2);
-							if (val.contains("$(pwd)")) {
-								val = dir.getAbsolutePath();
-							}
-							map.put(key, val);
-						}
-					});
-					JsonNode n = new ObjectMapper().convertValue(map, JsonNode.class);
-
-					return Optional.of(n);
-				}
-			} catch (IOException e) {
-				logger.warn("", e);
-			}
-		}
-		return Optional.empty();
-	}
 }

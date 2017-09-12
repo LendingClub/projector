@@ -28,13 +28,9 @@ import com.google.common.base.Preconditions;
 
 public class RegionScanner extends AbstractEC2Scanner {
 
-
-
-
-
 	public RegionScanner(AWSScannerBuilder builder) {
 		super(builder);
-	
+
 	}
 
 	@Override
@@ -47,38 +43,31 @@ public class RegionScanner extends AbstractEC2Scanner {
 
 		GraphNodeGarbageCollector gc = newGarbageCollector().label("AwsRegion").bindScannerContext();
 
-	
+		rateLimit();
 		DescribeRegionsResult result = getClient().describeRegions();
-		result.getRegions()
-				.forEach(
-						it -> {
-							try {
-								ObjectNode n = convertAwsObject(it, getRegion());
+		result.getRegions().forEach(it -> {
+			try {
+				ObjectNode n = convertAwsObject(it, getRegion());
 
-								n.remove(AccountScanner.ACCOUNT_ATTRIBUTE);
-								String cypher = "merge (x:AwsRegion {aws_regionName:{aws_regionName}}) set x+={props}  remove x.aws_region,x.aws_account set x.updateTs=timestamp() return x";
+				n.remove(AccountScanner.ACCOUNT_ATTRIBUTE);
+				String cypher = "merge (x:AwsRegion {aws_regionName:{aws_regionName}}) set x+={props}  remove x.aws_region,x.aws_account set x.updateTs=timestamp() return x";
 
-								NeoRxClient neoRx = getNeoRxClient();
-								Preconditions.checkNotNull(neoRx);
+				NeoRxClient neoRx = getNeoRxClient();
+				Preconditions.checkNotNull(neoRx);
 
-								neoRx.execCypher(cypher,
-										"aws_regionName",
-										n.path("aws_regionName").asText(),
-										AWSScanner.AWS_REGION_ATTRIBUTE,
-										n.path(AWSScanner.AWS_REGION_ATTRIBUTE).asText(), "props",
-										n).forEach(gc.MERGE_ACTION);
-								ScannerContext.getScannerContext().ifPresent(sc -> {
-									sc.incrementEntityCount();
-								});
+				neoRx.execCypher(cypher, "aws_regionName", n.path("aws_regionName").asText(),
+						AWSScanner.AWS_REGION_ATTRIBUTE, n.path(AWSScanner.AWS_REGION_ATTRIBUTE).asText(), "props", n)
+						.forEach(gc.MERGE_ACTION);
+				ScannerContext.getScannerContext().ifPresent(sc -> {
+					sc.incrementEntityCount();
+				});
 
-							} catch (RuntimeException e) {
-						
-								maybeThrow(e,"problem scanning regions");
-							}
-						});
-		
-	
-		
+			} catch (RuntimeException e) {
+
+				maybeThrow(e, "problem scanning regions");
+			}
+		});
+
 	}
 
 }

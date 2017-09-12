@@ -19,10 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
-import org.lendingclub.mercator.core.Projector;
-
-import com.amazonaws.AmazonWebServiceClient;
 import com.amazonaws.regions.Region;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClient;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
@@ -33,12 +31,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 public class LaunchConfigScanner extends AWSScanner<AmazonAutoScalingClient> {
 
 	public LaunchConfigScanner(AWSScannerBuilder builder) {
-		super(builder, AmazonAutoScalingClient.class,"AwsLaunchConfig");
+		super(builder, AmazonAutoScalingClient.class, "AwsLaunchConfig");
+		jsonConverter.flattenNestedObjects = true;
 	}
 
 	@Override
@@ -71,6 +69,13 @@ public class LaunchConfigScanner extends AWSScanner<AmazonAutoScalingClient> {
 							gc.MERGE_ACTION.accept(r);
 							getShadowAttributeRemover().removeTagAttributes("AwsLaunchConfig", n, r);
 						});
+
+				LinkageHelper securityGroupLinkage = new LinkageHelper().withNeo4j(getNeoRxClient())
+						.withFromArn(computeArn(n).get()).withFromLabel(getNeo4jLabel()).withLinkLabel("LAUNCHES_WITH")
+						.withTargetLabel("AwsSecurityGroup").withTargetValues(securityGroups.stream()
+								.map(sg -> createArn("ec2", "security-group", sg)).collect(Collectors.toList()));
+				securityGroupLinkage.execute();
+
 				incrementEntityCount();
 			} catch (RuntimeException e) {
 				maybeThrow(e);
@@ -83,10 +88,12 @@ public class LaunchConfigScanner extends AWSScanner<AmazonAutoScalingClient> {
 
 		DescribeLaunchConfigurationsResult results = getClient()
 				.describeLaunchConfigurations(new DescribeLaunchConfigurationsRequest());
+		rateLimit();
 		String token = results.getNextToken();
 		results.getLaunchConfigurations().forEach(consumer);
 
 		while (tokenHasNext(token)) {
+			rateLimit();
 			results = getClient()
 					.describeLaunchConfigurations(new DescribeLaunchConfigurationsRequest().withNextToken(token));
 			token = results.getNextToken();

@@ -39,7 +39,7 @@ public class SchemaManager {
 	}
 	
 	public void applyUniqueConstraint(String label, String attribute) {
-		applyConstraint(String.format("CREATE  CONSTRAINT ON (x:%s) ASSERT x.%s IS UNIQUE ",label,attribute));
+		applyConstraint(String.format("CREATE CONSTRAINT ON (x:%s) ASSERT x.%s IS UNIQUE ",label,attribute));
 		
 	}
 	public void applyConstraint(String c, boolean failOnError) {

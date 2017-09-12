@@ -49,6 +49,7 @@ public class SubnetScanner extends AbstractEC2Scanner{
 	@Override
 	protected void doScan() {
 	
+		rateLimit();
 		DescribeSubnetsResult result = getClient().describeSubnets();
 
 		GraphNodeGarbageCollector gc = newGarbageCollector().label("AwsSubnet").region(getRegion());

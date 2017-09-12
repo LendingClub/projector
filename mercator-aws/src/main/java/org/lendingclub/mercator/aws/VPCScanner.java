@@ -40,6 +40,7 @@ public class VPCScanner extends AbstractEC2Scanner {
 	protected void doScan() {
 
 	
+		rateLimit();
 		DescribeVpcsResult result = getClient().describeVpcs();
 
 		GraphNodeGarbageCollector gc = newGarbageCollector().region(getRegion()).label("AwsVpc");

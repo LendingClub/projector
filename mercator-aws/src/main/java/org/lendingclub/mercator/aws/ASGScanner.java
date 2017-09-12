@@ -25,7 +25,6 @@ import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 
 public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 
@@ -89,6 +88,7 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 		}
 		String token = null;
 		do {
+			rateLimit();
 			DescribeAutoScalingGroupsResult results = getClient().describeAutoScalingGroups(request);
 			token = results.getNextToken();
 			results.getAutoScalingGroups().forEach(consumer);
