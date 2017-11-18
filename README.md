@@ -2,7 +2,7 @@
 
 # Mercator
 
-[![Circle CI](https://circleci.com/gh/LendingClub/mercator.svg?style=svg)](https://circleci.com/gh/LendingClub/mercator)
+[![Build status](https://badge.buildkite.com/c3aa868e0bedd3006c2a985f16fcaf78b19db1c6b955051ae6.svg?branch=master)](https://buildkite.com/lendingclub/mercator)
 [![Download](https://api.bintray.com/packages/lendingclub/OSS/mercator/images/download.svg)](https://bintray.com/lendingclub/OSS/mercator/_latestVersion)
 
 
