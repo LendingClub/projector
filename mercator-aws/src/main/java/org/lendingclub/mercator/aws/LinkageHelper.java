@@ -15,25 +15,28 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 
 import org.lendingclub.neorx.NeoRxClient;
 
 import com.google.common.base.Preconditions;
 
-public class LinkageHelper {
+public class LinkageHelper implements Cloneable {
 
 	private String fromLabel;
 	private String targetLabel;
 	private String linkLabel;
 	private String targetLinkAttribute = "aws_arn";
-	private List<String> targetValues = Collections.emptyList();
+	private String moreWhere;
+	private Collection<String> targetValues = Collections.emptyList();
 	private NeoRxClient neo4j;
 	private String fromArn;
+	private Object[] moreParameters;
 
 	public void execute() {
-		
+
 		Preconditions.checkNotNull(fromLabel);
 		Preconditions.checkNotNull(targetLabel);
 		Preconditions.checkNotNull(linkLabel);
@@ -41,15 +44,24 @@ public class LinkageHelper {
 		Preconditions.checkNotNull(targetValues);
 		Preconditions.checkNotNull(neo4j);
 		Preconditions.checkNotNull(fromArn);
-		
+
 		// create links
 		//@formatter:off
 		String createCypher = "match (a:" + fromLabel + " { aws_arn: {fromArn} }), "
 						+ " (b:" + targetLabel + ")"
 						+ " where b." + targetLinkAttribute + " in {targetValues}"
+						+ (moreWhere != null ? (" and " + moreWhere) : " ")
 						+ " merge (a)-[r:" + linkLabel + "]->(b) set r.updateTs=timestamp()";
 		//@formatter:on
-		neo4j.execCypher(createCypher, "fromArn", fromArn, "targetValues", targetValues);
+		Object[] parameters = new Object[4 + (moreParameters != null ? moreParameters.length : 0)];
+		parameters[0] = "fromArn";
+		parameters[1] = fromArn;
+		parameters[2] = "targetValues";
+		parameters[3] = targetValues;
+		if (moreParameters != null) {
+			System.arraycopy(moreParameters, 0, parameters, 4, moreParameters.length);
+		}
+		neo4j.execCypher(createCypher, parameters);
 		// remove other links
 		//@formatter:off
 		String removeCypher = "match (a:" + fromLabel + " { aws_arn: {fromArn} })-[r:" + linkLabel + "]-(b:" + targetLabel + ")"
@@ -57,6 +69,12 @@ public class LinkageHelper {
 						+ " delete r";
 		//@formatter:on
 		neo4j.execCypher(removeCypher, "fromArn", fromArn, "targetValues", targetValues);
+	}
+
+	public LinkageHelper withMoreWhere(String where, Object... parameters) {
+		this.moreWhere = where;
+		this.moreParameters = parameters;
+		return this;
 	}
 
 	public LinkageHelper withFromLabel(String fromLabel) {
@@ -89,9 +107,25 @@ public class LinkageHelper {
 		return this;
 	}
 
-	public LinkageHelper withTargetValues(List<String> targetValues) {
+	public LinkageHelper withTargetValues(Collection<String> targetValues) {
 		this.targetValues = targetValues;
 		return this;
+	}
+
+	public LinkageHelper copy() {
+		try {
+			return (LinkageHelper) clone();
+		} catch (CloneNotSupportedException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	@Override
+	protected Object clone() throws CloneNotSupportedException {
+		LinkageHelper h = (LinkageHelper) super.clone();
+		h.targetValues = new ArrayList<>(targetValues);
+		h.moreParameters = moreParameters.clone();
+		return h;
 	}
 
 }

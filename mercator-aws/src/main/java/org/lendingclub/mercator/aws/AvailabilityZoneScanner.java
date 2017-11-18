@@ -24,15 +24,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 
-public class AvailabilityZoneScanner extends AbstractEC2Scanner{
-
-
-
-
+public class AvailabilityZoneScanner extends AbstractEC2NetworkInfrastructureScanner {
 
 	public AvailabilityZoneScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsAvailabilityZone");
+		super(builder, "AwsAvailabilityZone");
 	}
 
 	@Override

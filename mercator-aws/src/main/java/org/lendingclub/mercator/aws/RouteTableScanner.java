@@ -15,20 +15,24 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.lendingclub.neorx.NeoRxClient;
 
+import com.amazonaws.services.ec2.model.Route;
+import com.amazonaws.services.ec2.model.RouteTable;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Strings;
 
-public class RouteTableScanner extends AbstractEC2Scanner {
+public class RouteTableScanner extends AbstractEC2NetworkInfrastructureScanner {
+
 	public RouteTableScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsRouteTable");
-		jsonConverter.withFlattenNestedObjects(true);
+		super(builder, "AwsRouteTable");
 	}
 
 	@Override
@@ -45,19 +49,61 @@ public class RouteTableScanner extends AbstractEC2Scanner {
 				neo4j.execCypher(cypher, "arn", arn, "props", n).forEach(it -> {
 					gc.MERGE_ACTION.accept(it);
 				});
+				incrementEntityCount();
 
-				LinkageHelper subnetLinkage = new LinkageHelper().withNeo4j(neo4j).withFromLabel(getNeo4jLabel())
-						.withFromArn(arn).withTargetLabel("AwsSubnet").withLinkLabel("ATTACHED_TO").withTargetValues(
-								rt.getAssociations().stream().filter(a -> !Strings.isNullOrEmpty(a.getSubnetId()))
-										.map(a -> createEc2Arn("subnet", a.getSubnetId())).collect(Collectors.toList()));
+				LinkageHelper subnetLinkage = newLinkageHelper().withFromArn(arn).withTargetLabel("AwsSubnet")
+						.withLinkLabel("ATTACHED_TO")
+						.withTargetValues(rt.getAssociations().stream()
+								.filter(a -> !Strings.isNullOrEmpty(a.getSubnetId()))
+								.map(a -> createEc2Arn("subnet", a.getSubnetId())).collect(Collectors.toList()));
 				subnetLinkage.execute();
 
-				incrementEntityCount();
+				updateRoutes(rt, n.path("aws_arn").asText());
+
 			} catch (RuntimeException e) {
 				gc.markException(e);
 				maybeThrow(e);
 			}
 		});
+	}
+
+	private void updateRoutes(RouteTable rt, String arn) {
+		Set<String> vpcEndpoints = new HashSet<>();
+		Set<String> vpnGateways = new HashSet<>();
+		Set<String> internetGateways = new HashSet<>();
+		Set<String> peeringConnections = new HashSet<>();
+		for (Route r : rt.getRoutes()) {
+			if (r.getState().equals("blackhole")) {
+				continue;
+			}
+			if (!Strings.isNullOrEmpty(r.getGatewayId())) {
+				String id = r.getGatewayId();
+				if (id.startsWith("vpce-")) {
+					vpcEndpoints.add(id);
+				} else if (id.startsWith("vgw-")) {
+					vpnGateways.add(id);
+				} else if (id.startsWith("igw-")) {
+					internetGateways.add(id);
+				}
+			}
+			if (!Strings.isNullOrEmpty(r.getVpcPeeringConnectionId())) {
+				peeringConnections.add(r.getVpcPeeringConnectionId());
+			}
+		}
+		routeTo(arn, vpcEndpoints, "AwsVpcEndpoint", "aws_vpcEndpointId");
+		routeTo(arn, vpnGateways, "AwsVpnGateway", "aws_vpnGatewayId");
+		routeTo(arn, internetGateways, "AwsInternetGateway", "aws_internetGatewayId");
+		routeTo(arn, peeringConnections, "AwsVpcPeeringConnection", "aws_vpcPeeringConnectionId");
+	}
+
+	private void routeTo(String arn, Collection<String> ids, String targetLabel, String targetLinkAttribute) {
+		if (!ids.isEmpty()) {
+			LinkageHelper linkage = newLinkageHelper().withFromArn(arn).withLinkLabel("ROUTES_TO")
+					.withMoreWhere("b.aws_region = {R}", "R", getRegion().getName())
+					.withTargetLabel(targetLabel).withTargetLinkAttribute(targetLinkAttribute)
+					.withTargetValues(ids);
+			linkage.execute();
+		}
 	}
 
 	@Override

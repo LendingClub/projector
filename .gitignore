@@ -11,4 +11,5 @@ PrivateTest.java
 *.bak
 *~
 *.jar
-
+*.iml
+*.idea

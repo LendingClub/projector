@@ -26,8 +26,7 @@ import com.google.common.base.Strings;
 public class SecurityGroupScanner extends AbstractEC2Scanner {
 
 	public SecurityGroupScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsSecurityGroup");
+		super(builder, "AwsSecurityGroup");
 	}
 
 	@Override

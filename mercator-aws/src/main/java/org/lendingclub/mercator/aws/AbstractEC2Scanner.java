@@ -20,8 +20,8 @@ import com.google.common.base.Preconditions;
 
 public abstract class AbstractEC2Scanner extends AWSScanner<AmazonEC2Client> {
 
-	public AbstractEC2Scanner(AWSScannerBuilder builder) {
-		super(builder, AmazonEC2Client.class, "");
+	public AbstractEC2Scanner(AWSScannerBuilder builder, String label) {
+		super(builder, AmazonEC2Client.class, label);
 		Preconditions.checkNotNull(builder.getProjector());
 	}
 

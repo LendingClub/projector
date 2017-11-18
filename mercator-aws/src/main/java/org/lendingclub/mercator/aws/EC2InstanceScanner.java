@@ -49,7 +49,7 @@ import com.google.common.base.Strings;
 public class EC2InstanceScanner extends AbstractEC2Scanner {
 
 	public EC2InstanceScanner(AWSScannerBuilder builder) {
-		super(builder);
+		super(builder, "AwsEc2Instance");
 		jsonConverter.flattenNestedObjects = true;
 	}
 
@@ -70,10 +70,6 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 
 	private void writeInstance(Instance instance) {
 		writeInstance(instance, null);
-	}
-
-	public String getNeo4jLabel() {
-		return "AwsEc2Instance";
 	}
 
 	private void writeInstance(Instance instance, GraphNodeGarbageCollector gc) {
@@ -134,9 +130,8 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 				}
 				subnetMergeStopwatch.stop();
 
-				LinkageHelper securityGroupLinkage = new LinkageHelper().withNeo4j(getNeoRxClient())
-						.withFromArn(instanceArn).withFromLabel("AwsEc2Instance").withLinkLabel("ATTACHED_TO")
-						.withTargetLabel("AwsSecurityGroup")
+				LinkageHelper securityGroupLinkage = newLinkageHelper().withFromArn(instanceArn)
+						.withLinkLabel("ATTACHED_TO").withTargetLabel("AwsSecurityGroup")
 						.withTargetValues(instance.getSecurityGroups().stream()
 								.map(sg -> createEc2Arn("security-group", sg.getGroupId()))
 								.collect(Collectors.toList()));
@@ -144,7 +139,7 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 			}
 		} finally {
 			if (sw.elapsed(TimeUnit.MILLISECONDS) > 50) {
-				logger.info("writeInstance took {} ms (instance={}ms amiRelationship={}ms subnetRelationship={}ms",
+				logger.info("writeInstance took {} ms (instance={}ms amiRelationship={}ms subnetRelationship={}ms)",
 						sw.elapsed(TimeUnit.MILLISECONDS), instanceMergeStopwatch.elapsed(TimeUnit.MILLISECONDS),
 						amiMergeStopwatch.elapsed(TimeUnit.MILLISECONDS),
 						subnetMergeStopwatch.elapsed(TimeUnit.MILLISECONDS));

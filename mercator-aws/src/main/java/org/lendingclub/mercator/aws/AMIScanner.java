@@ -30,12 +30,10 @@ import com.google.common.base.Strings;
 
 public class AMIScanner extends AbstractEC2Scanner {
 
-
 	public static final String IMAGE_ID_ATTRIBUTE="aws_imageId";
 
 	public AMIScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsAmi");
+		super(builder, "AwsAmi");
 	}
 
 	@Override

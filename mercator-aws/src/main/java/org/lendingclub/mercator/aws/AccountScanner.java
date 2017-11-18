@@ -22,13 +22,10 @@ import com.google.common.base.Preconditions;
 
 public class AccountScanner extends AbstractEC2Scanner {
 
-
-
 	public static final String ACCOUNT_ATTRIBUTE="aws_account";
 
 	public AccountScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsAccount");
+		super(builder, "AwsAccount");
 		Preconditions.checkNotNull(builder.getProjector());
 	}
 

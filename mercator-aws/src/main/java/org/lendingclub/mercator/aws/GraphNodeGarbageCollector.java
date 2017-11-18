@@ -102,12 +102,13 @@ public class GraphNodeGarbageCollector implements CleanupTask {
 		Preconditions.checkArgument(!Strings.isNullOrEmpty(region), "region not set");
 
 		Stopwatch stopwatch = Stopwatch.createStarted();
+		int n = 0;
 		try {
 			String cypher = "match (x:" + label
-					+ " {aws_account: {account}, aws_region: {region}}) where x.updateTs<{ts} detach delete x";
-			getNeoRxClient().execCypher(cypher, "account", account, "region", region, "ts", ts);
+					+ " {aws_account: {account}, aws_region: {region}}) where x.updateTs<{ts} detach delete x return count(x)";
+			n = getNeoRxClient().execCypher(cypher, "account", account, "region", region, "ts", ts).blockingFirst().asInt();
 		} finally {
-			logger.info("purging all {} nodes in aws_account={} in region={} updated before {} - elapsed={} ms", label, account, region,
+			logger.info("purged {} {} nodes in aws_account={} in region={} updated before {} - elapsed={} ms", n, label, account, region,
 					ts,stopwatch.stop().elapsed(TimeUnit.MILLISECONDS));
 		}
 

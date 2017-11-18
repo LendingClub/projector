@@ -15,24 +15,29 @@
  */
 package org.lendingclub.mercator.demo;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
-import org.apache.log4j.Logger;
-import org.lendingclub.mercator.aws.AWSScannerBuilder;
-import org.lendingclub.mercator.aws.AllEntityScanner;
-import org.lendingclub.mercator.core.BasicProjector;
+import org.lendingclub.mercator.aws.MultiAccountRegionEntityScanner;
 import org.lendingclub.mercator.core.Projector;
 import org.lendingclub.mercator.docker.DockerScannerBuilder;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
+import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
 import com.amazonaws.regions.Regions;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
+import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder;
+import com.amazonaws.services.securitytoken.model.GetCallerIdentityRequest;
+import com.amazonaws.services.securitytoken.model.GetCallerIdentityResult;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 
 public class Main {
 
@@ -41,32 +46,37 @@ public class Main {
 		SLF4JBridgeHandler.install();
 		Projector projector = new Projector.Builder().build();
 
+		List<Regions> regionList = Splitter.on(",").omitEmptyStrings().trimResults()
+				.splitToList(Strings.nullToEmpty(System.getenv("AWS_REGIONS"))).stream().map(r -> Regions.fromName(r))
+				.collect(Collectors.toList());
+
+		AWSCredentialsProvider credentialsProvider = new DefaultAWSCredentialsProviderChain();
+		if (args.length > 0) {
+			AWSSecurityTokenService sts = AWSSecurityTokenServiceClientBuilder.standard().build();
+			credentialsProvider = new STSAssumeRoleSessionCredentialsProvider.Builder(args[0],
+					"mercator-demo-" + System.getProperty("user.name")).withStsClient(sts).build();
+		}
+		AWSSecurityTokenService sts = AWSSecurityTokenServiceClientBuilder.standard()
+				.withCredentials(credentialsProvider).build();
+		GetCallerIdentityResult awsIdentity = sts.getCallerIdentity(new GetCallerIdentityRequest());
+
+		if (regionList.isEmpty()) {
+			regionList = Arrays.asList(Regions.US_WEST_2, Regions.US_EAST_1);
+		}
+		LoggerFactory.getLogger(Main.class).info("scanning regions: {}", regionList);
+
+		MultiAccountRegionEntityScanner awsScanner = projector
+				.createBuilder(MultiAccountRegionEntityScanner.Builder.class)
+				.withAccountAndRegions(awsIdentity.getAccount(), credentialsProvider, regionList)
+				.withGlobalRegion(Regions.US_EAST_1).build();
+
 		Runnable awsTask = new Runnable() {
 
 			public void run() {
 				try {
-				List<String> regionList = Splitter.on(",").omitEmptyStrings().trimResults()
-						.splitToList(Strings.nullToEmpty(System.getenv("AWS_REGIONS")));
-			
-				if (regionList==null || regionList.isEmpty()) {
-					regionList = Lists.newArrayList();
-					regionList.add("us-west-2");
-					regionList.add("us-east-1");
-				}
-				LoggerFactory.getLogger(Main.class).info("scanning regions: {}",regionList);
-				regionList.forEach(it -> {
-					try {
-						org.slf4j.LoggerFactory.getLogger(Main.class).info("scanning region: {}",it);
-						Regions region = Regions.fromName(it);
-						projector.createBuilder(AWSScannerBuilder.class).withRegion(region)
-								.build(AllEntityScanner.class).scan();
-					} catch (Exception e) {
-						LoggerFactory.getLogger(Main.class).warn("problem scanning " + it, e);
-					}
-				});
-				}
-				catch (Exception e) {
-					LoggerFactory.getLogger(Main.class).warn("problem",e);
+					awsScanner.scan();
+				} catch (Exception e) {
+					LoggerFactory.getLogger(Main.class).warn("problem", e);
 				}
 			}
 
@@ -80,10 +90,14 @@ public class Main {
 		};
 
 		ScheduledExecutorService exec = Executors.newScheduledThreadPool(5);
-		exec.scheduleWithFixedDelay(awsTask, 0, 1, TimeUnit.MINUTES);
-		exec.scheduleWithFixedDelay(dockerTask, 0, 10, TimeUnit.SECONDS);
+		if (!Boolean.getBoolean("skipAwsScaning")) {
+			exec.scheduleWithFixedDelay(awsTask, 0, 1, TimeUnit.MINUTES);
+		}
+		if (!Boolean.getBoolean("skipDockerScanning")) {
+			exec.scheduleWithFixedDelay(dockerTask, 0, 10, TimeUnit.SECONDS);
+		}
 
-		while (true == true) {
+		while (true) {
 			try {
 				Thread.sleep(1000);
 			} catch (Exception e) {

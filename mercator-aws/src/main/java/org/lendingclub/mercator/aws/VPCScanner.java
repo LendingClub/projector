@@ -25,21 +25,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 
-public class VPCScanner extends AbstractEC2Scanner {
-
-
-
+public class VPCScanner extends AbstractEC2NetworkInfrastructureScanner {
 
 	public VPCScanner(AWSScannerBuilder builder) {
-		super(builder);
-
+		super(builder, "AwsVpc");
 	}
-
 
 	@Override
 	protected void doScan() {
-
-	
 		rateLimit();
 		DescribeVpcsResult result = getClient().describeVpcs();
 
