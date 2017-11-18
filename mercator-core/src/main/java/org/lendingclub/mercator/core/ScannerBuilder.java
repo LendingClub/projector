@@ -28,6 +28,7 @@ public abstract class ScannerBuilder<T> {
 	public Projector getProjector() {
 		return projector;
 	}
+	@SuppressWarnings("unchecked")
 	public <X extends ScannerBuilder<T>> X withFailOnError(boolean b) {
 		this.failOnError = b;
 		return (X) this;
@@ -41,7 +42,9 @@ public abstract class ScannerBuilder<T> {
 	}
 	public <X extends ScannerBuilder<T>> X withRateLimitPerSecond(double c) {
 		this.rateLimitPerSec = c;
-		return (X) this;
+		@SuppressWarnings("unchecked")
+		X x = (X) this;
+		return x;
 	}
 	public abstract T build();
 }

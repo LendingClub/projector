@@ -15,7 +15,10 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import org.lendingclub.mercator.core.Scanner;
 
 import com.amazonaws.AmazonWebServiceClient;
 import com.google.common.collect.Lists;
@@ -23,45 +26,48 @@ import com.google.common.collect.Lists;
 //@SuppressWarnings("rawtypes")
 public class AWSScannerGroup extends AWSScanner<AmazonWebServiceClient> {
 
+	List<Class<? extends AWSScanner<?>>> scannerList = Lists.newCopyOnWriteArrayList();
 
-	@SuppressWarnings("rawtypes")
-	List<Class<? extends AWSScanner>> scannerList = Lists.newCopyOnWriteArrayList();
-	
-	
 	public AWSScannerGroup(AWSScannerBuilder builder) {
-		super(builder,null,null);
+		super(builder, null, null);
 	}
-	@SuppressWarnings("rawtypes")
-	public List<Class<? extends AWSScanner>> getScannerTypes() {
+
+	public List<Class<? extends AWSScanner<?>>> getScannerTypes() {
 		return scannerList;
 	}
-	@SuppressWarnings("rawtypes")
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public AWSScannerGroup addScannerType(Class<? extends AWSScanner> type) {
-		scannerList.add(type);
+		scannerList.add((Class<? extends AWSScanner<?>>) type);
 		return this;
 	}
+
 	@SuppressWarnings("rawtypes")
 	public AWSScannerGroup removeScannerType(Class<? extends AWSScanner> type) {
 		scannerList.remove(type);
 		return this;
 	}
-	
-	
-	@Override
-	@SuppressWarnings("rawtypes")
-	protected void doScan() {
 
-		for (Class<? extends AWSScanner> scanner: scannerList) {
-			scan(scanner);
+	@Override
+	protected void doScan() {
+		for (Scanner scanner : getScanners()) {
+			try {
+				scanner.scan();
+			} catch (RuntimeException e) {
+				maybeThrow(e);
+			}
 		}
+
 	}
 
-	@SuppressWarnings("rawtypes")
-	protected void scan(Class<? extends AWSScanner> clazz) {
-		try {
-			AWSScannerBuilder.class.cast(builder.withFailOnError(isFailOnError())).build(clazz).scan();					
-		} catch (RuntimeException e) {
-			maybeThrow(e);
+	protected List<Scanner> getScanners() {
+		List<Scanner> result = new ArrayList<>();
+		for (Class<? extends AWSScanner<?>> scannerClass : scannerList) {
+			AWSScanner<?> scanner = builder.build(scannerClass);
+			if (scanner != null) {
+				result.add(scanner);
+			}
 		}
+		return result;
 	}
 }

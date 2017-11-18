@@ -27,8 +27,7 @@ import com.google.common.base.Strings;
 public class NetworkInterfaceScanner extends AbstractEC2Scanner {
 
 	public NetworkInterfaceScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsEc2NetworkInterface");
+		super(builder, "AwsEc2NetworkInterface");
 		jsonConverter.withFlattenNestedObjects(true);
 	}
 
@@ -46,8 +45,8 @@ public class NetworkInterfaceScanner extends AbstractEC2Scanner {
 					gc.MERGE_ACTION.accept(it);
 				});
 
-				LinkageHelper instanceLinkageHelper = new LinkageHelper().withNeo4j(neo4j).withFromArn(arn)
-						.withFromLabel(getNeo4jLabel()).withTargetLabel("AwsEc2Instance").withLinkLabel("ATTACHED_TO");
+				LinkageHelper instanceLinkageHelper = newLinkageHelper().withFromArn(arn).withTargetLabel("AwsEc2Instance")
+						.withLinkLabel("ATTACHED_TO");
 				if (intf.getAttachment() != null && "attached".equals(intf.getAttachment().getStatus())
 						&& !Strings.isNullOrEmpty(intf.getAttachment().getInstanceId())) {
 					instanceLinkageHelper.withTargetValues(
@@ -55,8 +54,8 @@ public class NetworkInterfaceScanner extends AbstractEC2Scanner {
 				}
 				instanceLinkageHelper.execute();
 
-				LinkageHelper subnetLinkageHelper = new LinkageHelper().withNeo4j(neo4j).withFromLabel(getNeo4jLabel())
-						.withFromArn(arn).withTargetLabel("AwsSubnet").withLinkLabel("EXISTS_IN")
+				LinkageHelper subnetLinkageHelper = newLinkageHelper().withFromArn(arn).withTargetLabel("AwsSubnet")
+						.withLinkLabel("EXISTS_IN")
 						.withTargetValues(Strings.isNullOrEmpty(intf.getSubnetId()) ? Collections.emptyList()
 								: Collections.singletonList(createEc2Arn("subnet", intf.getSubnetId())));
 				subnetLinkageHelper.execute();

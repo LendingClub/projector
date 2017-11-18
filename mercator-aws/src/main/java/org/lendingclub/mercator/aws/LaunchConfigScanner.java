@@ -70,10 +70,10 @@ public class LaunchConfigScanner extends AWSScanner<AmazonAutoScalingClient> {
 							getShadowAttributeRemover().removeTagAttributes("AwsLaunchConfig", n, r);
 						});
 
-				LinkageHelper securityGroupLinkage = new LinkageHelper().withNeo4j(getNeoRxClient())
-						.withFromArn(computeArn(n).get()).withFromLabel(getNeo4jLabel()).withLinkLabel("LAUNCHES_WITH")
-						.withTargetLabel("AwsSecurityGroup").withTargetValues(securityGroups.stream()
-								.map(sg -> createArn("ec2", "security-group", sg)).collect(Collectors.toList()));
+				LinkageHelper securityGroupLinkage = newLinkageHelper().withFromArn(computeArn(n).get())
+						.withLinkLabel("LAUNCHES_WITH").withTargetLabel("AwsSecurityGroup")
+						.withTargetValues(securityGroups.stream().map(sg -> createArn("ec2", "security-group", sg))
+								.collect(Collectors.toList()));
 				securityGroupLinkage.execute();
 
 				incrementEntityCount();

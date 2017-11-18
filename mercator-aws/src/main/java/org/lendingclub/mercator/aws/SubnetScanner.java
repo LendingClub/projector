@@ -24,16 +24,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 
-public class SubnetScanner extends AbstractEC2Scanner{
-
-
+public class SubnetScanner extends AbstractEC2NetworkInfrastructureScanner {
 
 	public SubnetScanner(AWSScannerBuilder builder) {
-		super(builder);
-
+		super(builder, "AwsSubnet");
 	}
-
-
 
 	@Override
 	public Optional<String> computeArn(JsonNode n){
@@ -43,8 +38,6 @@ public class SubnetScanner extends AbstractEC2Scanner{
 		return Optional.of(String.format("arn:aws:ec2:%s:%s:subnet/%s",region,n.get(AccountScanner.ACCOUNT_ATTRIBUTE).asText(),n.get("aws_subnetId").asText()));
 		
 	}
-	
-
 
 	@Override
 	protected void doScan() {
@@ -77,7 +70,5 @@ public class SubnetScanner extends AbstractEC2Scanner{
 		
 		gc.invoke();
 	}
-
-	
 
 }

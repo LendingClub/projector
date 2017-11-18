@@ -29,8 +29,7 @@ import com.google.common.base.Preconditions;
 public class RegionScanner extends AbstractEC2Scanner {
 
 	public RegionScanner(AWSScannerBuilder builder) {
-		super(builder);
-
+		super(builder, "AwsRegion");
 	}
 
 	@Override

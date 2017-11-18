@@ -16,6 +16,7 @@
 package org.lendingclub.mercator.aws;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.lendingclub.mercator.core.Projector;
 import org.lendingclub.mercator.core.ScannerBuilder;
@@ -37,68 +38,77 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 
 @SuppressWarnings("rawtypes")
-public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
-
+public class AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 
 	private Supplier<String> acccountIdSupplier = Suppliers.memoize(new AccountIdSupplier());
 	private Region region;
-	private AWSCredentialsProvider credentialsProvide;
+	private AWSCredentialsProvider credentialsProvider;
 	private ClientConfiguration clientConfiguration;
 	private Class<? extends AWSScanner> targetType;
-	
+	private boolean includeGlobalResources;
+	private AtomicReference<AWSParallelScannerGroup> initialScannerGroup = new AtomicReference<>();
+
 	public AWSScannerBuilder() {
-		
 	}
 
+	AWSScannerBuilder(AWSScannerBuilder builder) {
+		clientConfiguration = builder.clientConfiguration;
+		initialScannerGroup = builder.initialScannerGroup;
+		setProjector(builder.getProjector());
+		withFailOnError(builder.isFailOnError());
+		if (builder.getRateLimitPerSecond().isPresent()) {
+			withRateLimitPerSecond(builder.getRateLimitPerSecond().get());
+		}
+	}
+
+	@SuppressWarnings("unchecked")
 	@Override
-	public AWSScannerBuilder  withRateLimitPerSecond(double c) {
-		// TODO Auto-generated method stub
+	public AWSScannerBuilder withRateLimitPerSecond(double c) {
 		return (AWSScannerBuilder) super.withRateLimitPerSecond(c);
 	}
 
-
 	AWSCredentialsProvider getCredentialsProvider() {
-		if (credentialsProvide==null) {
+		if (credentialsProvider == null) {
 			return new DefaultAWSCredentialsProviderChain();
 		}
-		return credentialsProvide;
+		return credentialsProvider;
 	}
-	
+
 	public Supplier<String> getAccountIdSupplier() {
 		return acccountIdSupplier;
 	}
+
 	class AccountIdSupplier implements Supplier<String> {
 
 		@Override
 		public String get() {
-			AWSSecurityTokenServiceClientBuilder b = AWSSecurityTokenServiceClientBuilder.standard().withCredentials(getCredentialsProvider());
-			
+			AWSSecurityTokenServiceClientBuilder b = AWSSecurityTokenServiceClientBuilder.standard()
+					.withCredentials(getCredentialsProvider());
+
 			// this will fail if the region is not set
-			if (region!=null) {
+			if (region != null) {
 				b = b.withRegion(region.getName());
+			} else {
+				b = b.withRegion(Regions.US_EAST_1);
 			}
-			else {
-				b = b.withRegion(Regions.US_EAST_1); 
-			}
-			if (clientConfiguration!=null) {
+			if (clientConfiguration != null) {
 				b = b.withClientConfiguration(clientConfiguration);
 			}
 			AWSSecurityTokenService svc = b.build();
-			
-		
+
 			GetCallerIdentityResult result = svc.getCallerIdentity(new GetCallerIdentityRequest());
-			
+
 			return result.getAccount();
 		}
-		
+
 	}
-	
+
 	public AWSScannerBuilder withRegion(String region) {
 		return withRegion(Regions.fromName(region));
 	}
-	
+
 	public AWSScannerBuilder withRegion(Regions r) {
-	
+
 		Preconditions.checkState(this.region == null, "region already set");
 		this.region = Region.getRegion(r);
 		return this;
@@ -110,6 +120,11 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 		return this;
 	}
 
+	public AWSScannerBuilder withIncludeGlobalResources(boolean value) {
+		this.includeGlobalResources = value;
+		return this;
+	}
+
 	public AWSScannerBuilder withAccountId(final String id) {
 		this.acccountIdSupplier = new Supplier<String>() {
 
@@ -118,47 +133,53 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 				return id;
 			}
 
-			
 		};
 		return this;
 	}
 
-	
 	/**
-	 * This is more of a testing convenience than anything else.  Credentials are loaded using the DefaultAWSCredentialsProviderChain, and
-	 * then an alternate role is assumed.
+	 * This is more of a testing convenience than anything else. Credentials are
+	 * loaded using the DefaultAWSCredentialsProviderChain, and then an alternate
+	 * role is assumed.
 	 * 
-	 * @param roleArn the role that we are assuming.
-	 * @param sessionName the session name is user-chosen...usefull for auditing/logging
+	 * @param roleArn
+	 *            the role that we are assuming.
+	 * @param sessionName
+	 *            the session name is user-chosen...usefull for auditing/logging
 	 * @return
 	 */
 	public AWSScannerBuilder withAssumeRoleCredentials(String roleArn, String sessionName) {
-		
-		// If we wanted to be able to use a different credentials provider, we could.  We would just need to initialize a
-		// AWSSecurityTokenService and pass it to the STSAssumeRoleSessionCredentialsProvier.Builder.  I am leaving the code here just for reference, because
+
+		// If we wanted to be able to use a different credentials provider, we could. We
+		// would just need to initialize a
+		// AWSSecurityTokenService and pass it to the
+		// STSAssumeRoleSessionCredentialsProvier.Builder. I am leaving the code here
+		// just for reference, because
 		// it is really easy to forget.
-		
-		//AWSSecurityTokenService sts = AWSSecurityTokenServiceClientBuilder.standard().withCredentials(new DefaultAWSCredentialsProviderChain()).build();
-		
-		AWSCredentialsProvider p = new STSAssumeRoleSessionCredentialsProvider.Builder(roleArn,sessionName).build();
-		
+
+		// AWSSecurityTokenService sts =
+		// AWSSecurityTokenServiceClientBuilder.standard().withCredentials(new
+		// DefaultAWSCredentialsProviderChain()).build();
+
+		AWSCredentialsProvider p = new STSAssumeRoleSessionCredentialsProvider.Builder(roleArn, sessionName).build();
+
 		return withCredentials(p);
-		
+
 	}
+
 	public AWSScannerBuilder withCredentials(AWSCredentialsProvider p) {
-		this.credentialsProvide = p;
+		this.credentialsProvider = p;
 		return this;
 	}
-	
+
 	public AWSScannerBuilder withProjector(Projector p) {
 		Preconditions.checkState(this.getProjector() == null, "projector already set");
 		setProjector(p);
 		return this;
 	}
 
-	@SuppressWarnings("rawtypes")
 	public AwsClientBuilder configure(AwsClientBuilder b) {
-	
+
 		b = b.withRegion(Regions.fromName(region.getName())).withCredentials(getCredentialsProvider());
 		if (clientConfiguration != null) {
 			b = b.withClientConfiguration(clientConfiguration);
@@ -190,7 +211,6 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 		return build(AccountScanner.class);
 	}
 
-
 	public SecurityGroupScanner buildSecurityGroupScanner() {
 		return build(SecurityGroupScanner.class);
 	}
@@ -200,17 +220,17 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 	}
 
 	public RDSInstanceScanner buildRDSInstanceScanner() {
-		 return build(RDSInstanceScanner.class);
+		return build(RDSInstanceScanner.class);
 	}
-	
+
 	public ELBScanner buildELBScanner() {
 		return build(ELBScanner.class);
 	}
 
-
+	@SuppressWarnings("unchecked")
 	public <T extends AWSScanner> T build(Class<T> clazz) {
 		try {
-			this.targetType =  (Class<AWSScanner>) clazz;
+			this.targetType = (Class<AWSScanner>) clazz;
 			return (T) clazz.getConstructor(AWSScannerBuilder.class).newInstance(this);
 		} catch (IllegalAccessException | InstantiationException | InvocationTargetException
 				| NoSuchMethodException e) {
@@ -219,26 +239,36 @@ public class  AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public AWSScanner<AmazonWebServiceClient> build() {
-		Preconditions.checkState(targetType!=null,"target type not set");
+		Preconditions.checkState(targetType != null, "target type not set");
 		return (AWSScanner<AmazonWebServiceClient>) build(this.targetType);
-		
 	}
-	
+
 	public Region getRegion() {
 		return region;
 	}
 
+	public boolean isIncludeGlobalResources() {
+		return includeGlobalResources;
+	}
+
+	/* package */
+	AtomicReference<AWSParallelScannerGroup> getInitialScannerGroup() {
+		return initialScannerGroup;
+	}
+
+	@SuppressWarnings("unchecked")
 	@Override
 	public AWSScannerBuilder withFailOnError(boolean b) {
 		// this aids fluency by setting the correct return type
 		return super.withFailOnError(b);
 	}
-	
+
 	public AWSScannerBuilder withClientConfiguration(ClientConfiguration clientConfiguration) {
 		this.clientConfiguration = clientConfiguration;
 		return this;
 	}
-	
+
 }

@@ -204,10 +204,9 @@ public class ELBScanner extends AWSScanner<AmazonElasticLoadBalancingClient> {
 	}
 
 	protected void mapElbToSecurityGroups(LoadBalancerDescription lb, String elbArn, String region) {
-		LinkageHelper linkage = new LinkageHelper().withFromLabel(getNeo4jLabel()).withFromArn(elbArn)
-				.withNeo4j(getNeoRxClient()).withTargetLabel("AwsSecurityGroup").withLinkLabel("ATTACHED_TO")
-				.withTargetValues(lb.getSecurityGroups().stream().map(sg -> createArn("ec2", "security-group", sg))
-						.collect(Collectors.toList()));
+		LinkageHelper linkage = newLinkageHelper().withFromArn(elbArn).withTargetLabel("AwsSecurityGroup")
+				.withLinkLabel("ATTACHED_TO").withTargetValues(lb.getSecurityGroups().stream()
+						.map(sg -> createArn("ec2", "security-group", sg)).collect(Collectors.toList()));
 		linkage.execute();
 	}
 

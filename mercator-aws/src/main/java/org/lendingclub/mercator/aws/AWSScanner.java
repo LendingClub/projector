@@ -17,7 +17,6 @@ package org.lendingclub.mercator.aws;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.Optional;
 
 import org.lendingclub.mercator.core.AbstractScanner;
@@ -41,7 +40,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 
 public abstract class AWSScanner<T extends AmazonWebServiceClient> extends AbstractScanner {
@@ -58,14 +56,15 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 	protected AWSScannerBuilder builder;
 	protected JsonConverter jsonConverter = new JsonConverter();
 
-	Class<? extends AmazonWebServiceClient> clientType;
+	Class<T> clientType;
 
 	ShadowAttributeRemover shadowRemover;
+
 	public static final String AWS_REGION_ATTRIBUTE = "aws_region";
 	public static final String AWS_ACCOUNT_ATTRIBUTE = "aws_account";
 	public static final String AWS_ARN_ATTRIBUTE = "aws_arn";
 
-	public AWSScanner(AWSScannerBuilder builder, Class<? extends AmazonWebServiceClient> clientType, String label) {
+	public AWSScanner(AWSScannerBuilder builder, Class<T> clientType, String label) {
 		super(builder);
 		if (builder.getRegion() == null) {
 			builder.withRegion(Region.getRegion(Regions.US_EAST_1));
@@ -93,13 +92,12 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 		return shadowRemover;
 	}
 
-	protected <T extends AmazonWebServiceClient> T createClient(Class<T> clazz) {
+	protected T createClient(Class<T> clazz) {
 		try {
 			String builderClass = clazz.getName() + "Builder";
-			Class<? extends AwsSyncClientBuilder> builderClazz = (Class<? extends AwsSyncClientBuilder>) Class
-					.forName(builderClass);
+			Class<?> builderClazz = Class.forName(builderClass);
 			Method m = builderClazz.getMethod("standard");
-			return (T) builder.configure((AwsSyncClientBuilder) m.invoke(null)).build();
+			return clazz.cast(builder.configure((AwsSyncClientBuilder<?, ?>) m.invoke(null)).build());
 		} catch (ClassNotFoundException | IllegalAccessException | InvocationTargetException
 				| NoSuchMethodException e) {
 			throw new MercatorException(e);
@@ -154,9 +152,7 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 
 	public final void scan() {
 
-		List<String> x = Splitter.on(".").splitToList(getClass().getName());
-
-		new AWSScannerContext().withName(x.get(x.size() - 1)).exec(ctx -> {
+		new AWSScannerContext().withName(getClass().getSimpleName()).exec(ctx -> {
 
 			try {
 
@@ -233,9 +229,13 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 		});
 	}
 
+	protected String createArn(String service, String region, String entityType, String entityIdentifier) {
+		return "arn:aws:" + service + ":" + (region != null ? region : "") + ":" + getAccountId() + ":" + entityType
+				+ "/" + entityIdentifier;
+	}
+
 	protected String createArn(String service, String entityType, String entityIdentifier) {
-		return "arn:aws:" + service + ":" + getRegion().getName() + ":" + getAccountId() + ":" + entityType + "/"
-				+ entityIdentifier;
+		return createArn(service, getRegion().getName(), entityType, entityIdentifier);
 	}
 
 	@Override
@@ -250,6 +250,10 @@ public abstract class AWSScanner<T extends AmazonWebServiceClient> extends Abstr
 			logger.error("programming logic error", e);
 		}
 		return true;
+	}
+
+	protected LinkageHelper newLinkageHelper() {
+		return new LinkageHelper().withNeo4j(getNeoRxClient()).withFromLabel(getNeo4jLabel());
 	}
 
 }

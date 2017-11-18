@@ -30,15 +30,23 @@ import com.amazonaws.services.route53.model.ResourceRecordSet;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class Route53Scanner extends AWSScanner<AmazonRoute53Client> {
+public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implements AWSSlowScan {
 
 	public Route53Scanner(AWSScannerBuilder builder) {
 		super(builder, AmazonRoute53Client.class,"AwsRoute53HostedZone");
 
 	}
 
+	/**
+	 * This scanner is particularly slow for largish hosted zones.
+	 */
 	@Override
-	protected void doScan() {
+	public int[] getSlowScanRatio() {
+		return new int[] { 1, 17 };
+	}
+
+	@Override
+	protected void doGlobalScan() {
 
 		ListHostedZonesRequest request = new ListHostedZonesRequest();
 		ListHostedZonesResult result = new ListHostedZonesResult();

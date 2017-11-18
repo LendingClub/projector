@@ -27,10 +27,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Strings;
 
-public class VPCEndpointScanner extends AbstractEC2Scanner {
+public class VPCEndpointScanner extends AbstractEC2NetworkInfrastructureScanner {
 	public VPCEndpointScanner(AWSScannerBuilder builder) {
-		super(builder);
-		setNeo4jLabel("AwsVpcEndpoint");
+		super(builder, "AwsVpcEndpoint");
 		jsonConverter.withFlattenNestedObjects(true);
 	}
 
@@ -51,15 +50,15 @@ public class VPCEndpointScanner extends AbstractEC2Scanner {
 						gc.MERGE_ACTION.accept(it);
 					});
 
-					LinkageHelper routeTableLinkage = new LinkageHelper().withNeo4j(neo4j)
-							.withFromLabel(getNeo4jLabel()).withFromArn(arn).withTargetLabel("AwsRouteTable")
-							.withLinkLabel("AVAILABLE_IN").withTargetValues(endpoint.getRouteTableIds().stream()
+					LinkageHelper routeTableLinkage = newLinkageHelper().withFromArn(arn)
+							.withTargetLabel("AwsRouteTable").withLinkLabel("AVAILABLE_IN")
+							.withTargetValues(endpoint.getRouteTableIds().stream()
 									.map(r -> createEc2Arn("route-table", r)).collect(Collectors.toList()));
 
 					routeTableLinkage.execute();
 
-					LinkageHelper vpcLinkage = new LinkageHelper().withNeo4j(neo4j).withFromLabel(getNeo4jLabel())
-							.withFromArn(arn).withTargetLabel("AwsVpc").withLinkLabel("OWNED_BY")
+					LinkageHelper vpcLinkage = newLinkageHelper().withFromArn(arn).withTargetLabel("AwsVpc")
+							.withLinkLabel("OWNED_BY")
 							.withTargetValues(Collections.singletonList(createEc2Arn("vpc", endpoint.getVpcId())));
 					vpcLinkage.execute();
 
@@ -76,8 +75,8 @@ public class VPCEndpointScanner extends AbstractEC2Scanner {
 	@Override
 	public Optional<String> computeArn(JsonNode n) {
 		/*
-		 * The arn format for vpc endpoints isn't actually documented, but let's
-		 * assume it's true.
+		 * The arn format for vpc endpoints isn't actually documented, but let's assume
+		 * it's true.
 		 * 
 		 * http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.
 		 * html#arn-syntax-ec2
