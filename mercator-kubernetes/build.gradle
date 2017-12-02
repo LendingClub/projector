@@ -1,0 +1,32 @@
+
+
+// Apply the java plugin to add support for Java
+apply plugin: 'java'
+
+// In this section you declare where to find the dependencies of your project
+repositories {
+    // Use 'jcenter' for resolving your dependencies.
+    // You can declare any Maven/Ivy/file repository here.
+    jcenter()
+}
+
+// In this section you declare the dependencies for your production and test code
+dependencies {
+
+	compile project(':mercator-core')
+    compile 'io.fabric8:kubernetes-client:3.1.0'
+    
+    testCompile project(':mercator-test')
+    testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
+    testCompile 'org.mockito:mockito-core:2.7.0'
+}
+
+
+test {
+    testLogging {
+        // Make sure output from
+        // standard out or error is shown
+        // in Gradle output.
+        showStandardStreams = true
+    }
+}

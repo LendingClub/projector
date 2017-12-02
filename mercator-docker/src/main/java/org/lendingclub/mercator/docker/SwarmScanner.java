@@ -69,13 +69,11 @@ public class SwarmScanner {
 		dockerScanner.getNeoRxClient()
 				.execCypher(
 						"merge (n:DockerHost {swarmNodeId:{nodeId}}) set n+={props}, n.updateTs=timestamp() return n",
-						"nodeId", swarmNodeId, "props", n).forEach(actual->{
-							removeDockerLabels("DockerHost", "swarmNodeId", swarmNodeId, n, actual);
-							updateTs.set(Math.min(updateTs.get(), actual.path("updateTs").asLong(Long.MAX_VALUE)));
-						});
-				
-				
-				
+						"nodeId", swarmNodeId, "props", n)
+				.forEach(actual -> {
+					removeDockerLabels("DockerHost", "swarmNodeId", swarmNodeId, n, actual);
+					updateTs.set(Math.min(updateTs.get(), actual.path("updateTs").asLong(Long.MAX_VALUE)));
+				});
 
 		logger.info("connecting swarm={} to node={}", swarmClusterId, swarmNodeId);
 		dockerScanner.getNeoRxClient().execCypher(
@@ -101,9 +99,9 @@ public class SwarmScanner {
 	}
 
 	/**
-	 * The Docker java client is significantly behind the server API. Rather
-	 * than try to fork/patch our way to success, we just implement a bit of
-	 * magic to get access to the underlying jax-rs WebTarget.
+	 * The Docker java client is significantly behind the server API. Rather than
+	 * try to fork/patch our way to success, we just implement a bit of magic to get
+	 * access to the underlying jax-rs WebTarget.
 	 * 
 	 * Docker should just expose this as a public method.
 	 * 
@@ -284,12 +282,10 @@ public class SwarmScanner {
 			try {
 				ObjectNode n = flattenService(it);
 				n.put("swarmClusterId", swarmClusterId);
-				dockerScanner.getNeoRxClient()
-						.execCypher(
-								"merge (x:DockerService {serviceId:{serviceId}}) set x+={props}, x.updateTs=timestamp() return x",
-								"serviceId", n.get("serviceId").asText(), "props", n)
-						.forEach(svc -> {
-							removeDockerLabels("DockerService","serviceId",n.get("serviceId").asText(),n, svc);
+				dockerScanner.getNeoRxClient().execCypher(
+						"merge (x:DockerService {serviceId:{serviceId}}) set x+={props}, x.updateTs=timestamp() return x",
+						"serviceId", n.get("serviceId").asText(), "props", n).forEach(svc -> {
+							removeDockerLabels("DockerService", "serviceId", n.get("serviceId").asText(), n, svc);
 							earlistUpdate
 									.set(Math.min(earlistUpdate.get(), svc.path("updateTs").asLong(Long.MAX_VALUE)));
 						});
@@ -372,6 +368,7 @@ public class SwarmScanner {
 
 		ObjectNode n = flattenTask(it);
 
+	
 		n.put("swarmClusterId", getSwarmClusterId().get());
 
 		String taskId = n.get("taskId").asText();
@@ -379,8 +376,7 @@ public class SwarmScanner {
 		String swarmNodeId = n.path("swarmNodeId").asText();
 		checkNotEmpty(taskId, "taskId");
 		checkNotEmpty(serviceId, "serviceId");
-		checkNotEmpty(swarmNodeId, "swarmNodeId");
-
+		
 		AtomicLong timestamp = new AtomicLong(Long.MAX_VALUE);
 		dockerScanner.getNeoRxClient()
 				.execCypher("merge (x:DockerTask {taskId:{taskId}}) set x+={props}, x.updateTs=timestamp() return x",
@@ -388,7 +384,7 @@ public class SwarmScanner {
 				.forEach(tt -> {
 
 					timestamp.set(tt.path("updateTs").asLong(Long.MAX_VALUE));
-					
+
 					removeDockerLabels("DockerTask", "taskId", taskId, n, it);
 				});
 
@@ -398,10 +394,11 @@ public class SwarmScanner {
 			dockerScanner.getNeoRxClient().execCypher(
 					"match (s:DockerService {serviceId:{serviceId}}),(t:DockerTask{taskId:{taskId}}) merge (s)-[x:CONTAINS]->(t) set x.updateTs=timestamp() return t,s",
 					"serviceId", serviceId, "taskId", taskId);
-
-			dockerScanner.getNeoRxClient().execCypher(
-					"match (h:DockerHost {swarmNodeId:{swarmNodeId}}), (t:DockerTask {swarmNodeId:{swarmNodeId}}) merge (h)-[x:RUNS]->(t) set x.updateTs=timestamp()",
-					"swarmNodeId", swarmNodeId);
+			if (!Strings.isNullOrEmpty(swarmNodeId)) {
+				dockerScanner.getNeoRxClient().execCypher(
+						"match (h:DockerHost {swarmNodeId:{swarmNodeId}}), (t:DockerTask {swarmNodeId:{swarmNodeId}}) merge (h)-[x:RUNS]->(t) set x.updateTs=timestamp()",
+						"swarmNodeId", swarmNodeId);
+			}
 		}
 		return timestamp.get();
 	}
@@ -454,12 +451,12 @@ public class SwarmScanner {
 				n.put("swarmClusterId", scid.get());
 				dockerScanner.getNeoRxClient().execCypher(
 						"merge (x:DockerService {serviceId:{serviceId}}) set x+={props}, x.updateTs=timestamp() return x",
-						"serviceId", n.get("serviceId").asText(), "props", n).forEach(actual->{
+						"serviceId", n.get("serviceId").asText(), "props", n).forEach(actual -> {
 							try {
-							removeDockerLabels("DockerService", "serviceId", n.get("serviceId").asText(), n, actual);
-							}
-							catch (Exception e) {
-								logger.warn("problem removing labels: "+e.toString());
+								removeDockerLabels("DockerService", "serviceId", n.get("serviceId").asText(), n,
+										actual);
+							} catch (Exception e) {
+								logger.warn("problem removing labels: " + e.toString());
 							}
 						});
 
@@ -498,32 +495,34 @@ public class SwarmScanner {
 
 	/**
 	 * Removes labels that were present from a scan, but subsequently removed.
+	 * 
 	 * @param neo4jLabel
 	 * @param idName
 	 * @param idVal
 	 * @param intended
 	 * @param actual
 	 */
-	protected void removeDockerLabels(String neo4jLabel, String idName, String idVal, JsonNode intended, JsonNode actual) {
-		
+	protected void removeDockerLabels(String neo4jLabel, String idName, String idVal, JsonNode intended,
+			JsonNode actual) {
+
 		List<String> x = Lists.newArrayList();
-		actual.fieldNames().forEachRemaining(it->{
-			if (it!=null && it.startsWith("label_")) {
+		actual.fieldNames().forEachRemaining(it -> {
+			if (it != null && it.startsWith("label_")) {
 				if (!intended.has(it)) {
-					
+
 					if (!it.contains(" ")) {
-						x.add("a.`"+it+"`");
+						x.add("a.`" + it + "`");
 					}
 				}
 			}
 		});
 		if (!x.isEmpty()) {
-			String cypher = "match (a:"+neo4jLabel+" {"+idName+":{id}}) remove "+Joiner.on(", ").join(x)+" return a";
-		
-			dockerScanner.getNeoRxClient().execCypher(cypher, "id",idVal);
+			String cypher = "match (a:" + neo4jLabel + " {" + idName + ":{id}}) remove " + Joiner.on(", ").join(x)
+					+ " return a";
+
+			dockerScanner.getNeoRxClient().execCypher(cypher, "id", idVal);
 		}
-		
-		
+
 	}
 
 	protected boolean isNotFound(Throwable e) {
