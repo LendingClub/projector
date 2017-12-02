@@ -44,7 +44,7 @@ public class KubeScannerBuilder extends ScannerBuilder<KubeScanner> {
 	JsonNode kubeConfig;
 	String clusterId;
 	String clusterName;
-	
+
 	public KubeScannerBuilder withKubernetesClient(KubernetesClient client) {
 		this.kubernetesClient = client;
 		return this;
@@ -54,31 +54,38 @@ public class KubeScannerBuilder extends ScannerBuilder<KubeScanner> {
 		this.clusterName = name;
 		return this;
 	}
-	
+
 	private void setClusterIdIfNotSet(String n) {
 		if (Strings.isNullOrEmpty(clusterId)) {
 			this.clusterId = n;
 		}
 	}
+
 	public KubeScannerBuilder withKubeConfigCluster(String cluster) {
-		kubeConfig.path("clusters").forEach(it->{
+		AtomicBoolean found = new AtomicBoolean(false);
+		kubeConfig.path("clusters").forEach(it -> {
 			if (it.path("name").asText().equals(cluster)) {
 				withClusterName(it.path("name").asText());
 				setClusterIdIfNotSet(Hashing.sha1().hashBytes(it.path("name").asText().getBytes()).toString());
 				String server = it.path("cluster").path("server").asText();
-				withConfig(c->{
+				withConfig(c -> {
 					c.withMasterUrl(server);
 				});
+				found.set(true);
 			}
 		});
+		if (!found.get()) {
+			throw new IllegalArgumentException("cluster not found: "+cluster);
+		}
 		return this;
 	}
+
 	public KubeScannerBuilder withKubeConfigUser(String user) {
-		
-		kubeConfig.path("users").forEach(it->{
+
+		kubeConfig.path("users").forEach(it -> {
 			if (it.path("name").asText().equals(user)) {
 				String authToken = it.path("user").path("auth-provider").path("config").path("access-token").asText();
-				withConfig(c->{
+				withConfig(c -> {
 					logger.info("setting token");
 					c.withOauthToken(authToken);
 				});
@@ -86,40 +93,40 @@ public class KubeScannerBuilder extends ScannerBuilder<KubeScanner> {
 		});
 		return this;
 	}
+
 	public KubeScannerBuilder withDefaultKubeConfig() {
 		return withKubeConfig(new File(System.getProperty("user.home"), ".kube/config"));
 	}
-	
+
 	public KubeScannerBuilder withCurrentContext() {
 		return withContext("current-context");
 	}
+
 	public KubeScannerBuilder withClusterId(String id) {
 		this.clusterId = id;
 		return this;
 	}
+
 	public KubeScannerBuilder withContext(String name) {
 		Preconditions.checkNotNull(kubeConfig);
 
-	
-	
 		AtomicBoolean found = new AtomicBoolean(false);
-		kubeConfig.path("contexts").forEach(it->{
+		kubeConfig.path("contexts").forEach(it -> {
 			String contextName = it.path("name").asText();
-		
+
 			if (it.path("name").asText().equals(contextName)) {
 				found.set(true);
-			
+
 				withKubeConfigUser(it.path("context").path("user").asText());
 				withKubeConfigCluster(it.path("context").path("cluster").asText());
 			}
-		});		
-		if (found.get()==false) {
-			throw new MercatorException("cotnext not found: "+name);
+		});
+		if (found.get() == false) {
+			throw new MercatorException("cotnext not found: " + name);
 		}
 		return this;
 	}
-	
-	
+
 	public KubeScannerBuilder withKubeConfig(File f) {
 		try {
 			ObjectMapper m = new ObjectMapper(new YAMLFactory());
@@ -144,13 +151,13 @@ public class KubeScannerBuilder extends ScannerBuilder<KubeScanner> {
 	@Override
 	public KubeScanner build() {
 
-			if (kubernetesClient == null) {
+		if (kubernetesClient == null) {
 			kubernetesClient = new DefaultKubernetesClient(configBuilder.build());
 		}
-			Preconditions.checkState(!Strings.isNullOrEmpty(clusterName),"clusterName must be set");
-			Preconditions.checkState(!Strings.isNullOrEmpty(clusterId),"clusterId must be set");
+		Preconditions.checkState(!Strings.isNullOrEmpty(clusterName), "clusterName must be set");
+		Preconditions.checkState(!Strings.isNullOrEmpty(clusterId), "clusterId must be set");
 
-		KubeScanner scanner =  new KubeScanner(this);
+		KubeScanner scanner = new KubeScanner(this);
 		scanner.clusterName = clusterName;
 		scanner.clusterId = clusterId;
 		return scanner;

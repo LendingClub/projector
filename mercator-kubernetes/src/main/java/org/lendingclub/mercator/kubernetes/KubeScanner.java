@@ -33,6 +33,9 @@ import io.fabric8.kubernetes.api.model.ContainerState;
 import io.fabric8.kubernetes.api.model.ContainerStateRunning;
 import io.fabric8.kubernetes.api.model.ContainerStateTerminated;
 import io.fabric8.kubernetes.api.model.Namespace;
+import io.fabric8.kubernetes.api.model.Node;
+import io.fabric8.kubernetes.api.model.NodeSpec;
+import io.fabric8.kubernetes.api.model.NodeStatus;
 import io.fabric8.kubernetes.api.model.ObjectMeta;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.PodSpec;
@@ -52,15 +55,16 @@ public class KubeScanner extends AbstractScanner {
 		this.clusterId = KubeScannerBuilder.class.cast(builder).clusterId;
 		client = KubeScannerBuilder.class.cast(builder).kubernetesClient;
 		clusterName = KubeScannerBuilder.class.cast(builder).clusterName;
-		
+
 	}
 
 	public String getClusterName() {
-		Preconditions.checkState(!Strings.isNullOrEmpty(clusterName),"clusterName must be set");
+		Preconditions.checkState(!Strings.isNullOrEmpty(clusterName), "clusterName must be set");
 		return clusterName;
 	}
+
 	public String getClusterId() {
-		Preconditions.checkState(!Strings.isNullOrEmpty(clusterId),"clusterId must be set");
+		Preconditions.checkState(!Strings.isNullOrEmpty(clusterId), "clusterId must be set");
 		return clusterId;
 	}
 
@@ -69,14 +73,14 @@ public class KubeScanner extends AbstractScanner {
 	}
 
 	public void scanCluster() {
-		
+
 		ObjectNode props = mapper.createObjectNode();
 		if (!Strings.isNullOrEmpty(clusterName)) {
 			props.put("clusterName", clusterName);
 		}
 		getNeoRxClient().execCypher("merge (a:KubeCluster {clusterId:{clusterId}})  "
 				+ "on create set a+={props},a.url={url}, a.updateTs=timestamp(),a.createTs=timestamp() on match set a+={props},a.url={url}, a.updateTs=timestamp()",
-				"clusterId", getClusterId(), "url", client.getMasterUrl().toString(),"props",props);
+				"clusterId", getClusterId(), "url", client.getMasterUrl().toString(), "props", props);
 
 	}
 
@@ -90,8 +94,8 @@ public class KubeScanner extends AbstractScanner {
 		n.put("selfLink", md.getSelfLink());
 		n.put("clusterId", getClusterId());
 
-		getNeoRxClient().execCypher("merge (a:KubeNamespace {uid:{uid}}) set a+={props}, a.updateTs=timestamp()",
-				"uid", md.getUid(), "props", n);
+		getNeoRxClient().execCypher("merge (a:KubeNamespace {uid:{uid}}) set a+={props}, a.updateTs=timestamp()", "uid",
+				md.getUid(), "props", n);
 	}
 
 	public void scanNamespaces() {
@@ -225,19 +229,76 @@ public class KubeScanner extends AbstractScanner {
 				"match (p:KubePod {uid:{uid}}), (c:KubeContainer {podUid:{uid}}) MERGE (p)-[x:CONTAINS]->(c) set x.updateTs=timestamp()",
 				"uid", meta.getUid());
 
-		getNeoRxClient().execCypher("match (a:KubePod {uid:{uid}})--(c:KubeContainer) where c.updateTs<{ts} detach delete c","uid",meta.getUid(),"ts",ts);
+		getNeoRxClient().execCypher(
+				"match (a:KubePod {uid:{uid}})--(c:KubeContainer) where c.updateTs<{ts} detach delete c", "uid",
+				meta.getUid(), "ts", ts);
 	}
 
 	long getCurrentTimestamp() {
 		return getNeoRxClient().execCypher("return timestamp()").blockingFirst().asLong();
 	}
+
+	public void scanNode(Node node) {
+		ObjectNode n = mapper.createObjectNode();
+		ObjectMeta meta = node.getMetadata();
+		n.put("nodeUid", meta.getUid());
+		n.put("resourceVersion", meta.getResourceVersion());
+		n.put("name", meta.getName());
+		n.put("namespace", meta.getNamespace());
+		
+		
+		n.put("clusterName", meta.getClusterName());
+
+		n.put("generateName", meta.getGenerateName());
+		n.put("creationTimestamp", meta.getCreationTimestamp());
+		n.put("deletionTimestamp", meta.getDeletionTimestamp());
+		n.put("deletionGracePeriod", meta.getDeletionGracePeriodSeconds());
+		n.put("selfLink", meta.getSelfLink());
+
+		NodeStatus ns = node.getStatus();
+
+		NodeSpec nodeSpec = node.getSpec();
+
+		n.put("externalId", nodeSpec.getExternalID());
+		n.put("unschedulable", nodeSpec.getUnschedulable());
+		n.put("podCIDR", nodeSpec.getPodCIDR());
+		n.put("providerId", nodeSpec.getProviderID());
+
+		n.put("clusterId", clusterId);
+		getNeoRxClient().execCypher("merge (n:KubeNode {nodeUid:{nodeUid}}) set n.clusterId={clusterId}, n+={props}",
+				"nodeUid", meta.getUid(), "props", n, "clusterId", clusterId);
+
+	}
+
+	public void scanNodes() {
+		ScannerContext sc = new ScannerContext();
+
+		sc.withName("KubeNode").exec(ctx -> {
+			getKubernetesClient().nodes().list().getItems().forEach(it -> {
+				scanNode(it);
+			});
+			
+		});
+		
+	/*	getNeoRxClient().execCypher(
+				"match (n:KubeNode {clusterId:{clusterId}}),(ns:KubeNamespace {clusterId:{clusterId}}) "
+						+ "where n.namespace=ns.name "
+						+ " merge (ns)-[c:CONTAINS]->(n) on create set c.createTs=timestamp()  set c.updateTs=timestamp()",
+				"clusterId", clusterId);
+				*/
+		getNeoRxClient().execCypher(
+				"match (n:KubeNode {clusterId:{clusterId}}),(c:KubeCluster {clusterId:{clusterId}}) "
+						
+						+ " merge (c)-[x:CONTAINS]->(n) on create set c.createTs=timestamp()  set c.updateTs=timestamp()",
+				"clusterId", clusterId);
+	}
+
 	public void scanPods() {
 
-		
 		ScannerContext sc = new ScannerContext();
 		long ts = getCurrentTimestamp();
 		sc.withName("KubernetesPod").exec(ctx -> {
-		
+
 			getKubernetesClient().pods().inAnyNamespace().list().getItems().forEach(it -> {
 				try {
 					scanPod(it);
@@ -247,14 +308,15 @@ public class KubeScanner extends AbstractScanner {
 				}
 			});
 		});
-		
+
 		getNeoRxClient().execCypher(
 				"match (c:KubeNamespace {clusterId:{clusterId}}), (p:KubePod {clusterId:{clusterId}})  where p.namespace=c.name merge (c)-[x:CONTAINS]->(p) set x.updateTs=timestamp()",
 				"clusterId", getClusterId());
-		
+
 		if (!sc.hasExceptions()) {
-		getNeoRxClient().execCypher("match (p:KubePod {clusterId:{clusterId}}) where p.updateTs<{ts} detach delete p","clusterId",getClusterId(),
-				"ts",ts);
+			getNeoRxClient().execCypher(
+					"match (p:KubePod {clusterId:{clusterId}}) where p.updateTs<{ts} detach delete p", "clusterId",
+					getClusterId(), "ts", ts);
 		}
 	}
 
@@ -262,6 +324,7 @@ public class KubeScanner extends AbstractScanner {
 	public void scan() {
 		scanCluster();
 		scanNamespaces();
+		scanNodes();
 		scanPods();
 
 	}
