@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import org.lendingclub.neorx.NeoRxClient;
@@ -39,14 +41,15 @@ public class NetworkInterfaceScanner extends AbstractEC2Scanner {
 
 			NeoRxClient neo4j = getNeoRxClient();
 			try {
-				String cypher = "merge (x:AwsEc2NetworkInterface {aws_arn:{arn}}) set x+={props}, x.updateTs=timestamp() return x";
+				String cypher = "merge (x:AwsEc2NetworkInterface {aws_arn:{arn}}) set x+={props}, x.updateTs=timestamp(), x:CidrBlock return x";
 				String arn = n.path("aws_arn").asText();
+				n.put("cidrBlock", intf.getPrivateIpAddress() + "/32");
 				neo4j.execCypher(cypher, "arn", arn, "props", n).forEach(it -> {
 					gc.MERGE_ACTION.accept(it);
 				});
 
-				LinkageHelper instanceLinkageHelper = newLinkageHelper().withFromArn(arn).withTargetLabel("AwsEc2Instance")
-						.withLinkLabel("ATTACHED_TO");
+				LinkageHelper instanceLinkageHelper = newLinkageHelper().withFromArn(arn)
+						.withTargetLabel("AwsEc2Instance").withLinkLabel("ATTACHED_TO");
 				if (intf.getAttachment() != null && "attached".equals(intf.getAttachment().getStatus())
 						&& !Strings.isNullOrEmpty(intf.getAttachment().getInstanceId())) {
 					instanceLinkageHelper.withTargetValues(
@@ -59,6 +62,15 @@ public class NetworkInterfaceScanner extends AbstractEC2Scanner {
 						.withTargetValues(Strings.isNullOrEmpty(intf.getSubnetId()) ? Collections.emptyList()
 								: Collections.singletonList(createEc2Arn("subnet", intf.getSubnetId())));
 				subnetLinkageHelper.execute();
+
+				List<String> securityGroupIds = new ArrayList<>();
+				intf.getGroups().forEach(g -> {
+					securityGroupIds.add(createEc2Arn("security-group", g.getGroupId()));
+				});
+				LinkageHelper securityGroupLinkageHelper = newLinkageHelper().withFromArn(arn)
+						.withTargetLabel("AwsSecurityGroup").withLinkLabel("SECURED_BY")
+						.withTargetValues(securityGroupIds);
+				securityGroupLinkageHelper.execute();
 
 				incrementEntityCount();
 			} catch (RuntimeException e) {

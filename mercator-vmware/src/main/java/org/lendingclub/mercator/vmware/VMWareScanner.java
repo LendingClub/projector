@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.lendingclub.mercator.vmware;
 
 import java.rmi.RemoteException;
@@ -341,6 +340,14 @@ public class VMWareScanner extends AbstractScanner {
 
 	}
 
+	public void clearStaleVMWareHosts() {
+		logger.info("deleting stale VMWare hosts");
+		String deleteOldHostsQuery = "match(vmh: VMWareHost) where ( (timestamp()-vmh.updateTs)/(1000*60) ) > 240 "
+				+ " detach delete vmh";
+
+		getNeoRxClient().execCypher(deleteOldHostsQuery);
+	}
+
 	protected String getUniqueId(HostSystem h) {
 		return computeUniqueId(h.getMOR());
 
@@ -390,10 +397,19 @@ public class VMWareScanner extends AbstractScanner {
 		}
 	}
 
+	public void clearStaleRelationshipsBetweenClustersAndHosts() {
+		String deleteOldRelationshipsBetweenClustersAndHosts = "match(v: VMWareCluster) -[r: CONTAINS]->(h) "
+				+ "where (timestamp()-r.updateTs)/(1000*60)  > 240 delete r";
+
+		getProjector().getNeoRxClient().execCypher(deleteOldRelationshipsBetweenClustersAndHosts);
+	}
+
 	@Override
 	public void scan() {
 		scanAllDatacenters();
 		scanAllHosts();
+		clearStaleVMWareHosts();
+		clearStaleRelationshipsBetweenClustersAndHosts();
 	}
 
 	

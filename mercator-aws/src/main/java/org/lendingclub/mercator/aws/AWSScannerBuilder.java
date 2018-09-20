@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,6 +167,7 @@ public class AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 
 	}
 
+
 	public AWSScannerBuilder withCredentials(AWSCredentialsProvider p) {
 		this.credentialsProvider = p;
 		return this;
@@ -227,6 +228,11 @@ public class AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 		return build(ELBScanner.class);
 	}
 
+	public SpotFleetRequestScanner buildSpotFleetRequestScanner() {
+		checkRequiredState();
+		return build(SpotFleetRequestScanner.class);
+	}
+
 	@SuppressWarnings("unchecked")
 	public <T extends AWSScanner> T build(Class<T> clazz) {
 		try {
@@ -271,4 +277,11 @@ public class AWSScannerBuilder extends ScannerBuilder<AWSScanner> {
 		return this;
 	}
 
+	public ClientConfiguration getClientConfiguration() {
+		return this.clientConfiguration;
+	}
+	
+	public AWSScannerBuilder withConfig(AWSScanner x) {
+		return withAccountId(x.getAccountId()).withRegion(x.getRegion()).withClientConfiguration(x.getAWSScannerBuilder().getClientConfiguration()).withCredentials(x.getAWSScannerBuilder().getCredentialsProvider());
+	}
 }

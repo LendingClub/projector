@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,6 @@ public class VPCPeeringConnectionScanner extends AbstractEC2NetworkInfrastructur
 	public VPCPeeringConnectionScanner(AWSScannerBuilder builder) {
 		super(builder, "AwsVpcPeeringConnection");
 		jsonConverter.flattenNestedObjects = true;
-	}
-
-	@Override
-	public int[] getSlowScanRatio() {
-		return new int[] { 1, 30 };
 	}
 
 	@Override

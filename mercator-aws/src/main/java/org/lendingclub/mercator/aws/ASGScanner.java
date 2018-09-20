@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,30 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClient;
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
+import com.amazonaws.services.autoscaling.model.AutoScalingInstanceDetails;
 import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsRequest;
 import com.amazonaws.services.autoscaling.model.DescribeAutoScalingGroupsResult;
+import com.amazonaws.services.autoscaling.model.DescribeAutoScalingInstancesRequest;
+import com.amazonaws.services.autoscaling.model.DescribeAutoScalingInstancesResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 
 	public ASGScanner(AWSScannerBuilder builder) {
-		super(builder, AmazonAutoScalingClient.class,"AwsAsg");
+		super(builder, AmazonAutoScalingClient.class, "AwsAsg");
 	}
 
 	@Override
@@ -37,9 +46,22 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 		return Optional.of(n.path("aws_autoScalingGroupARN").asText());
 	}
 
+	public void scanASGNames(Collection<String> x) {
+
+		// very subtle differene between the vargs version. No/empty list means nothing
+		// to do.
+		// Do not necessarily love the behavior on the varags version....maybe we can
+		// eliminate it.
+		if (x == null || x.size() == 0) {
+			// do nothing
+		} else {
+			scanASGNames(x.toArray(new String[0]));
+		}
+	}
+
 	public void scanASGNames(String... asgNames) {
 		if (asgNames == null || asgNames.length == 0) {
-			doScan();
+			return;
 		} else {
 			doScan(asgNames);
 		}
@@ -51,9 +73,9 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 	}
 
 	private void doScan(String... asgNames) {
-		
+
 		GraphNodeGarbageCollector gc = newGarbageCollector();
-		if (asgNames==null || asgNames.length==0) {
+		if (asgNames == null || asgNames.length == 0) {
 			gc.bindScannerContext();
 		}
 
@@ -72,12 +94,12 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 				incrementEntityCount();
 				mapAsgRelationships(asg, asgArn, getRegion().getName());
 			} catch (RuntimeException e) {
-		
+
 				maybeThrow(e, "problem scanning asg");
 			}
 
 		}, asgNames);
-		
+
 	}
 
 	private void forEachAsg(Consumer<AutoScalingGroup> consumer, String... asgNames) {
@@ -167,4 +189,63 @@ public class ASGScanner extends AWSScanner<AmazonAutoScalingClient> {
 				+ ") " + " where r.updateTs < {updateTs} delete r", "asgArn", asgArn, "updateTs", updateTs);
 	}
 
+	/**
+	 * Scans all ASGs in the current account/region context. Any missing ASGs will
+	 * be added. Any missing instances will be added. Unless deepScan is enabled,
+	 * existing ASGs and Instances will not, themselves be rescanned. This will,
+	 * however, ensure that all the correct entities are in place.
+	 * 
+	 * @param deep
+	 */
+	public void scanHeirarchy(boolean deepScan) {
+
+		if (deepScan == true) {
+			throw new UnsupportedOperationException("deep heierarchy scan not yet supported");
+		}
+		// enumerate all the ASGs and compare to what is in neo4j
+
+		DescribeAutoScalingInstancesRequest request = new DescribeAutoScalingInstancesRequest();
+		DescribeAutoScalingInstancesResult result = getClient().describeAutoScalingInstances(request);
+		Set<String> asgInstances = Sets.newHashSet();
+		Set<String> asgNames = Sets.newHashSet();
+		List<AutoScalingInstanceDetails> asgInstanceDetails = Lists.newArrayList();
+		do {
+			result.getAutoScalingInstances().forEach(it -> {
+				asgInstances.add(it.getInstanceId());
+				asgNames.add(it.getAutoScalingGroupName());
+				asgInstanceDetails.add(it);
+			});
+
+			if (tokenHasNext(result.getNextToken())) {
+				request = new DescribeAutoScalingInstancesRequest();
+				request.setNextToken(result.getNextToken());
+			}
+			request = null;
+		} while (request != null);
+
+		// fetch all the ASGs from neo4j, figure out what is missing and what isn't
+		// fetch all the instances in neo4j and figure out what is missing and what
+		// isn't
+		Set<String> neo4jAsgNames = Sets.newHashSet();
+		getNeoRxClient().execCypher(
+				"match (a:AwsAsg {aws_account:{account},aws_region:{region}}) return a.aws_autoScalingGroupName as name,a.aws_arn",
+				"account", getAccountId(), "region", getRegion().getName()).map(it -> it.path("name").asText())
+				.forEach(it -> {
+					neo4jAsgNames.add(it);
+				});
+
+		Set<String> neo4jInstances = Sets.newHashSet(getNeoRxClient().execCypher(
+				"match (a:AwsEc2Instance {aws_account:{account},aws_region:{region}}) return a.aws_instanceId as  instanceId,a.aws_arn",
+				"account", getAccountId(), "region", getRegion().getName()).map(x -> x.path("instanceId").asText())
+				.toList().blockingGet());
+
+		Set<String> missingAsgs = Sets.difference(asgNames, neo4jAsgNames);
+		Set<String> missingInstances = Sets.difference(asgInstances, neo4jInstances);
+
+		logger.info("ASGs to be added to neo4j: {}", missingAsgs.size());
+		logger.info("Instances to be added to neo4j: {}", missingAsgs.size());
+		newAWSScannerBuilder().build(EC2InstanceScanner.class).scanInstances(missingInstances);
+		scanASGNames(missingAsgs);
+
+	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package org.lendingclub.mercator.docker;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 import javax.ws.rs.ProcessingException;
@@ -25,7 +28,10 @@ import org.lendingclub.mercator.core.MercatorException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.DockerCmdExecFactory;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.core.DockerClientImpl;
+import com.github.dockerjava.jaxrs.JerseyDockerCmdExecFactory;
 
 /**
  * The docker java client is really not that useful for much other than
@@ -41,7 +47,7 @@ public class DockerRestClient {
 
 	public static DockerRestClient forDockerClient(DockerClient client) {
 		DockerRestClient x = new DockerRestClient();
-		x.webTarget = SwarmScanner.extractWebTarget(client);
+		x.webTarget = extractWebTarget(client);
 		return x;
 	}
 
@@ -111,5 +117,33 @@ public class DockerRestClient {
 
 	public Optional<String> getSwarmClusterId() {
 		return Optional.ofNullable(getInfo().path("Swarm").path("Cluster").path("ID").asText(null));
+	}
+	/**
+	 * The Docker java client is significantly behind the server API. Rather than
+	 * try to fork/patch our way to success, we just implement a bit of magic to get
+	 * access to the underlying jax-rs WebTarget.
+	 * 
+	 * Docker should just expose this as a public method.
+	 * 
+	 * @param c
+	 * @return
+	 */
+	public static WebTarget extractWebTarget(DockerClient c) {
+
+		try {
+			for (Field m : DockerClientImpl.class.getDeclaredFields()) {
+
+				if (DockerCmdExecFactory.class.isAssignableFrom(m.getType())) {
+					m.setAccessible(true);
+					JerseyDockerCmdExecFactory f = (JerseyDockerCmdExecFactory) m.get(c);
+					Method method = f.getClass().getDeclaredMethod("getBaseResource");
+					method.setAccessible(true);
+					return (WebTarget) method.invoke(f);
+				}
+			}
+		} catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+			throw new IllegalStateException("could not obtain WebTarget", e);
+		}
+		throw new IllegalStateException("could not obtain WebTarget");
 	}
 }

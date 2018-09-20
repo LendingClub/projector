@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@
 package org.lendingclub.mercator.aws;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -45,6 +47,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 public class EC2InstanceScanner extends AbstractEC2Scanner {
 
@@ -147,28 +150,54 @@ public class EC2InstanceScanner extends AbstractEC2Scanner {
 		}
 	}
 
-	public void scanInstanceId(String... instanceIdList) {
+	
 
-		Arrays.asList(instanceIdList).forEach(instanceId -> {
+	public void scanInstances(String... instances) {
+		scanInstanceId(instances);
+	}
 
-			String token = null;
-			DescribeInstancesRequest request = new DescribeInstancesRequest().withInstanceIds(instanceId);
+	public void scanInstancesLastUpdatedBefore(long interval, TimeUnit unit) {
+		List<String> staleRecords = getNeoRxClient().execCypher("match (a:AwsEc2Instance {aws_region:{region},aws_account:{account}}) "
+				+ "where abs(timestamp()-a.updateTs)>{threshold} return a.aws_instanceId",
+				"region",getRegion().getName(),"account",getAccountId(),"threshold",unit.toMillis(interval)).map(x->x.asText()).toList().blockingGet();
+		
+		logger.info("rescanning {} stale ec2 instance records",staleRecords.size());
+		scanInstances(staleRecords);
+		
+	}
 
-			do {
-				rateLimit();
-				DescribeInstancesResult results = getClient().describeInstances();
-				results.getReservations().forEach(reservation -> {
-					reservation.getInstances().forEach(instance -> {
-						try {
-							writeInstance(instance);
-						} catch (RuntimeException e) {
-							maybeThrow(e);
-						}
-					});
+	public void scanInstanceId(String... id) {
+		if (id == null || id.length == 0) {
+			return;
+		}
+		scanInstances(Arrays.asList(id));
+	}
+
+	public void scanInstances(Collection<String> instanceIdList) {
+
+		if (instanceIdList == null || instanceIdList.isEmpty()) {
+			return;
+		}
+
+		String token = null;
+		DescribeInstancesRequest request = new DescribeInstancesRequest()
+				.withInstanceIds(instanceIdList.toArray(new String[0]));
+
+		do {
+			rateLimit();
+			DescribeInstancesResult results = getClient().describeInstances(request);
+			results.getReservations().forEach(reservation -> {
+				reservation.getInstances().forEach(instance -> {
+					try {
+						writeInstance(instance);
+					} catch (RuntimeException e) {
+						maybeThrow(e);
+					}
 				});
-				request.setNextToken(results.getNextToken());
-			} while (tokenHasNext(token));
-		});
+			});
+			request.setNextToken(results.getNextToken());
+		} while (tokenHasNext(token));
+
 	}
 
 	@Override

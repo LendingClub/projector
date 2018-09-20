@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ public class SwarmScannerTest extends MercatorIntegrationTest {
 		SwarmScanner ss = new SwarmScanner(p.createBuilder(DockerScannerBuilder.class).build());
 		
 		String id = "junit-"+System.currentTimeMillis();
-		JsonNode actual = p.getNeoRxClient().execCypher("merge (x:DockerService {serviceId:{id}}) set x.label_c='c', x.label_foo='foo', x.junitData=true return x","id",id).blockingFirst();
+		JsonNode actual = p.getNeoRxClient().execCypher("merge (x:DockerService:JUnitTestNode {serviceId:{id}}) set x.label_c='c', x.label_foo='foo' return x","id",id).blockingFirst();
 		
 		JsonNode intended = mapper.createObjectNode().put("label_a", "1").put("label_b", "2").put("chinacat","sunflower");
 		

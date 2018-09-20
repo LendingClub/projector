@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,8 +42,7 @@ public class AWSScannerGroup extends AWSScanner<AmazonWebServiceClient> {
 		return this;
 	}
 
-	@SuppressWarnings("rawtypes")
-	public AWSScannerGroup removeScannerType(Class<? extends AWSScanner> type) {
+	public AWSScannerGroup removeScannerType(Class<?> type) {
 		scannerList.remove(type);
 		return this;
 	}

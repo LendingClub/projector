@@ -28,6 +28,7 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'maven'
     apply plugin: 'eclipse'
+    apply plugin: 'checkstyle'
     apply plugin: "com.github.hierynomus.license"
 	
     group 'org.lendingclub.mercator'
@@ -48,9 +49,13 @@ subprojects {
         testCompile "org.assertj:assertj-core:${ASSERTJ_VERSION}"
     }
 
+	checkstyle {
+	       ignoreFailures = false 
+	       configFile = rootProject.file('config/checkstyle.xml')
+	}
 	license {
     	header rootProject.file('LICENSE')
-    	strictCheck true
+    	strictCheck false
 	}
     task sourcesJar(type: Jar, dependsOn: classes) {
         classifier = 'sources'

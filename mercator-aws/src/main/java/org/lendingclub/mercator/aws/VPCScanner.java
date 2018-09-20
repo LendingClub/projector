@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.lendingclub.mercator.aws;
 
 import java.util.Optional;
@@ -43,8 +42,9 @@ public class VPCScanner extends AbstractEC2NetworkInfrastructureScanner {
 		result.getVpcs().forEach(it -> {
 			try {					
 				ObjectNode n = convertAwsObject(it, getRegion());
+				n.put("cidrBlock", it.getCidrBlock());
 									
-				String cypher = "merge (x:AwsVpc {aws_arn:{aws_arn}}) set x+={props} set x.updateTs=timestamp() return x";
+				String cypher = "merge (x:AwsVpc {aws_arn:{aws_arn}}) set x+={props}, x.updateTs=timestamp(), x:CidrBlock return x";
 				
 				String mapToSubnetCypher = "match (y:AwsSubnet {aws_vpcId:{aws_vpcId}}), "
 						+ "(x:AwsVpc {aws_arn:{aws_arn}}) "

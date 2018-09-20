@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,17 +22,19 @@ public class AllEntityScanner extends AWSParallelScannerGroup {
 
 		addScannerType(Route53Scanner.class);
 		addScannerType(IAMScannerGroup.class);
-		
 		addScannerType(EC2ScannerGroup.class);
 		addScannerType(ASGScannerGroup.class);
 		addScannerType(ELBScanner.class);
-		addScannerType(RDSInstanceScanner.class);
+		addScannerType(ELBv2ScannerGroup.class);
+		addScannerType(RDSScannerGroup.class);
 		addScannerType(S3BucketScanner.class);
 		addScannerType(SQSScanner.class);
 		addScannerType(SNSScanner.class);
-
-		// addScannerType(KinesisScanner.class); // Kinesis seems to be heavily
-		// rate-limited...leave it off for now
+		addScannerType(KinesisScanner.class);
+		addScannerType(DynamoDBTableScanner.class);
+		addScannerType(ECRRepositoryScanner.class);
+		addScannerType(SpotFleetRequestScanner.class);
+		addScannerType(EKSClusterScanner.class);
 	}
 
 }

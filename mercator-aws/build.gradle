@@ -29,6 +29,10 @@ dependencies {
     compile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
 }
 
+task graphdoc(type: JavaExec) {
+  classpath sourceSets.test.runtimeClasspath
+  main = "org.lendingclub.mercator.aws.GraphDocMain"
+}
 
 test {
     testLogging {

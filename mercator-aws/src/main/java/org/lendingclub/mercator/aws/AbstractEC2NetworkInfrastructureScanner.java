@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.concurrent.TimeUnit;
+
 public abstract class AbstractEC2NetworkInfrastructureScanner extends AbstractEC2Scanner implements AWSSlowScan {
 
 	public AbstractEC2NetworkInfrastructureScanner(AWSScannerBuilder builder, String label) {
@@ -23,8 +25,8 @@ public abstract class AbstractEC2NetworkInfrastructureScanner extends AbstractEC
 	}
 
 	@Override
-	public int[] getSlowScanRatio() {
-		return new int[] { 1, 30 };
+	public long getMinimumScanInterval() {
+		return TimeUnit.MINUTES.toMillis(35L);
 	}
 
 
