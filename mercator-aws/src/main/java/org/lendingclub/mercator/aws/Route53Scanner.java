@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.lendingclub.mercator.aws;
+
+import java.util.concurrent.TimeUnit;
 
 import org.lendingclub.mercator.core.ScannerContext;
 
@@ -33,7 +35,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implements AWSSlowScan {
 
 	public Route53Scanner(AWSScannerBuilder builder) {
-		super(builder, AmazonRoute53Client.class,"AwsRoute53HostedZone");
+		super(builder, AmazonRoute53Client.class, "AwsRoute53HostedZone");
 
 	}
 
@@ -41,13 +43,16 @@ public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implem
 	 * This scanner is particularly slow for largish hosted zones.
 	 */
 	@Override
-	public int[] getSlowScanRatio() {
-		return new int[] { 1, 17 };
+	public long getMinimumScanInterval() {
+		return TimeUnit.MINUTES.toMillis(75L);
 	}
-
-	@Override
-	protected void doGlobalScan() {
-
+	public void scanHostedZonesWithRecordSets() {
+		scanHostedZones(true);
+	}
+	public void scanHostedZonesWithoutRecordSets() {
+		scanHostedZones(false);
+	}
+	public void scanHostedZones(boolean deep) {
 		ListHostedZonesRequest request = new ListHostedZonesRequest();
 		ListHostedZonesResult result = new ListHostedZonesResult();
 
@@ -55,14 +60,25 @@ public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implem
 			rateLimit();
 			result = getClient().listHostedZones(request);
 			for (HostedZone zone : result.getHostedZones()) {
-				scanHostedZoneById(zone.getId());
+				scanHostedZoneById(zone.getId(), deep);
 			}
 			request.setMarker(result.getMarker());
 		} while (result.isTruncated());
+	}
+
+	@Override
+	protected void doGlobalScan() {
+
+		scanHostedZones(true);
 
 	}
 
 	public void scanHostedZoneById(String id) {
+		scanHostedZoneById(id, true);
+	}
+
+	
+	public void scanHostedZoneById(String id, boolean deep) {
 
 		GetHostedZoneRequest request = new GetHostedZoneRequest();
 		request.setId(id);
@@ -70,7 +86,7 @@ public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implem
 		rateLimit();
 		GetHostedZoneResult result = getClient().getHostedZone(request);
 
-		projectHostedZoneResult(result);
+		projectHostedZoneResult(result, deep);
 	}
 
 	ObjectNode toJson(GetHostedZoneResult hzResult) {
@@ -123,14 +139,14 @@ public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implem
 		getNeoRxClient().execCypher(
 				"match (r:AwsRoute53RecordSet {aws_name:{aws_name}}), (z:AwsRoute53HostedZone {aws_id : {aws_id}}) merge (z)-[x:CONTAINS]->(r) set x.updateTs={updateTs}",
 				"aws_name", rs.getName(), "aws_id", hostedZoneId, "updateTs", timestamp);
-		
+
 		ScannerContext.getScannerContext().ifPresent(sc -> {
 			sc.incrementEntityCount();
 		});
 
 	}
 
-	protected void projectHostedZoneResult(GetHostedZoneResult hostedZoneResult) {
+	protected void projectHostedZoneResult(GetHostedZoneResult hostedZoneResult, boolean scanRecordSets) {
 
 		HostedZone hz = hostedZoneResult.getHostedZone();
 		ObjectNode n = toJson(hostedZoneResult);
@@ -139,30 +155,32 @@ public class Route53Scanner extends GlobalAWSScanner<AmazonRoute53Client> implem
 				"merge (a:AwsRoute53HostedZone {aws_id:{aws_id}}) set a+={props}, a.updateTs=timestamp() return a",
 				"aws_id", n.get("aws_id").asText(), "props", n);
 
-		ListResourceRecordSetsRequest request = new ListResourceRecordSetsRequest();
-		request.setHostedZoneId(hz.getId());
-		ListResourceRecordSetsResult result;
+		if (scanRecordSets) {
+			ListResourceRecordSetsRequest request = new ListResourceRecordSetsRequest();
+			request.setHostedZoneId(hz.getId());
+			ListResourceRecordSetsResult result;
 
-		long timestamp = System.currentTimeMillis();
+			long timestamp = System.currentTimeMillis();
 
-		do {
-			rateLimit();
-			result = getClient().listResourceRecordSets(request);
-			request.setStartRecordName(result.getNextRecordName());
+			do {
+				rateLimit();
+				result = getClient().listResourceRecordSets(request);
+				request.setStartRecordName(result.getNextRecordName());
 
-			for (ResourceRecordSet rs : result.getResourceRecordSets()) {
+				for (ResourceRecordSet rs : result.getResourceRecordSets()) {
 
-				projectResourceRecordSet(hz.getId(), rs, timestamp);
+					projectResourceRecordSet(hz.getId(), rs, timestamp);
 
-			}
+				}
 
-		} while (result.isTruncated());
+			} while (result.isTruncated());
 
-		getNeoRxClient().execCypher(
-				"match (z:AwsRoute53HostedZone {aws_id:{aws_id}})--(r:AwsRoute53RecordSet) where r.updateTs<{ts} detach delete r",
-				"ts", timestamp, "aws_id", hz.getId());
-		getNeoRxClient().execCypher(
-				"match (a:AwsRoute53RecordSet) where not (a)-[:CONTAINS]-(:AwsRoute53HostedZone) detach delete a");
+			getNeoRxClient().execCypher(
+					"match (z:AwsRoute53HostedZone {aws_id:{aws_id}})--(r:AwsRoute53RecordSet) where r.updateTs<{ts} detach delete r",
+					"ts", timestamp, "aws_id", hz.getId());
+			getNeoRxClient().execCypher(
+					"match (a:AwsRoute53RecordSet) where not (a)-[:CONTAINS]-(:AwsRoute53HostedZone) detach delete a");
+		}
 	}
 
 }

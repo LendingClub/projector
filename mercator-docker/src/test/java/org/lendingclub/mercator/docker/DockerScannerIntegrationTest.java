@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,11 @@ public class DockerScannerIntegrationTest extends LocalDockerDaemonIntegrationTe
 		try {
 			getDockerScanner().getRestClient().get("/nodes/nodenotofound");
 			Assertions.failBecauseExceptionWasNotThrown(NotFoundException.class);
-		} catch (Exception e) {
+		} 
+		catch (Exception e) {
+			if (e.toString().contains("not a swarm manager")) {
+				return;
+			}
 			Assertions.assertThat(e).isInstanceOf(NotFoundException.class);
 		}
 	}
@@ -51,5 +55,10 @@ public class DockerScannerIntegrationTest extends LocalDockerDaemonIntegrationTe
 		getDockerScanner().getSchemaManager().applyConstraints();
 		// this will not run if neo4j or docker is not available
 		getDockerScanner().scan();
+	}
+	
+	@Test
+	public void testSwarmScanner() {
+		getDockerScanner().scanService("objective_lewinx");
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,22 @@
  */
 package org.lendingclub.mercator.docker;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URLEncoder;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.WebTarget;
 
+import org.lendingclub.mercator.core.MercatorException;
 import org.lendingclub.mercator.core.NotFoundException;
 import org.lendingclub.neorx.NeoRxException;
 import org.slf4j.Logger;
@@ -33,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.MissingNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.dockerjava.api.DockerClient;
@@ -47,7 +53,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.collect.Lists;
 
-public class SwarmScanner {
+class SwarmScanner {
 
 	ObjectMapper mapper = new ObjectMapper();
 	Logger logger = LoggerFactory.getLogger(SwarmScanner.class);
@@ -98,34 +104,7 @@ public class SwarmScanner {
 		return out;
 	}
 
-	/**
-	 * The Docker java client is significantly behind the server API. Rather than
-	 * try to fork/patch our way to success, we just implement a bit of magic to get
-	 * access to the underlying jax-rs WebTarget.
-	 * 
-	 * Docker should just expose this as a public method.
-	 * 
-	 * @param c
-	 * @return
-	 */
-	public static WebTarget extractWebTarget(DockerClient c) {
 
-		try {
-			for (Field m : DockerClientImpl.class.getDeclaredFields()) {
-
-				if (DockerCmdExecFactory.class.isAssignableFrom(m.getType())) {
-					m.setAccessible(true);
-					JerseyDockerCmdExecFactory f = (JerseyDockerCmdExecFactory) m.get(c);
-					Method method = f.getClass().getDeclaredMethod("getBaseResource");
-					method.setAccessible(true);
-					return (WebTarget) method.invoke(f);
-				}
-			}
-		} catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-			throw new IllegalStateException("could not obtain WebTarget", e);
-		}
-		throw new IllegalStateException("could not obtain WebTarget");
-	}
 
 	protected boolean isUnixDomainScoket(String jerseyUri) {
 		// Jersey reports the URL of a unix domain socket as
@@ -134,8 +113,72 @@ public class SwarmScanner {
 
 	}
 
+	private static String urlEncode(String val) {
+		try {
+			return URLEncoder.encode(val, "UTF8");
+		} catch (UnsupportedEncodingException e) {
+			throw new MercatorException(e);
+		}
+	}
+
+	public void scanTasksForService(String serviceId) {
+		// /v1.32/tasks?filters={"service":{"wlztbhnr5y5kjmq8rwov33okp":true}}
+
+		WebTarget t = DockerRestClient.extractWebTarget(dockerScanner.getDockerClient());
+
+		ObjectNode n = mapper.createObjectNode();
+		n.set("service", mapper.createObjectNode().put(serviceId, true));
+		ArrayNode tasks = mapper.createArrayNode();
+		
+		try {
+			tasks = (ArrayNode) t.path("tasks").queryParam("filters", urlEncode(n.toString())).request().get(JsonNode.class);
+		}
+		catch (ProcessingException e) {
+			if (Strings.nullToEmpty(e.getMessage()).contains("not found")) {
+				// do nothing
+			}
+		}
+		List<String> taskIdList = Lists.newArrayList();
+		AtomicReference<String> actualServiceId = new AtomicReference<>();
+		if (tasks.isArray()) {
+			tasks.forEach(it -> {
+				String taskId = it.path("ID").asText();
+				taskIdList.add(taskId);
+				saveTask(it);
+
+				// get the service id
+				String tmp = it.path("ServiceID").asText();
+				if (!Strings.isNullOrEmpty(tmp)) {
+					actualServiceId.set(tmp);
+				}
+			});
+
+			
+			// Now go back through any tasks that might be 
+			if (!Strings.isNullOrEmpty(actualServiceId.get())) {
+				dockerScanner.getNeoRxClient().execCypher(
+						"match (t:DockerTask {serviceId:{id}}) return t.swarmClusterId,t.taskId as taskId",
+						"id", actualServiceId.get()).forEach(it -> {
+							try {
+								String taskId = it.path("taskId").asText();
+								if (!Strings.isNullOrEmpty(taskId)) {
+									if (!taskIdList.contains(taskId)) {
+									
+										scanTask(taskId);
+									}
+								}
+							} catch (Exception e) {
+								dockerScanner.maybeThrow(e);
+							}
+						});
+			}
+
+		}
+
+	}
+
 	public void scan() {
-		WebTarget t = extractWebTarget(dockerScanner.getDockerClient());
+		WebTarget t = DockerRestClient.extractWebTarget(dockerScanner.getDockerClient());
 		logger.info("Scanning {}", t);
 		JsonNode response = t.path("/info").request().buildGet().invoke(JsonNode.class);
 
@@ -272,7 +315,7 @@ public class SwarmScanner {
 		return out;
 	}
 
-	public void scanServicesForSwarm(String swarmClusterId) {
+	private void scanServicesForSwarm(String swarmClusterId) {
 
 		JsonNode response = getRestClient().getServices();
 
@@ -368,7 +411,6 @@ public class SwarmScanner {
 
 		ObjectNode n = flattenTask(it);
 
-	
 		n.put("swarmClusterId", getSwarmClusterId().get());
 
 		String taskId = n.get("taskId").asText();
@@ -376,7 +418,7 @@ public class SwarmScanner {
 		String swarmNodeId = n.path("swarmNodeId").asText();
 		checkNotEmpty(taskId, "taskId");
 		checkNotEmpty(serviceId, "serviceId");
-		
+
 		AtomicLong timestamp = new AtomicLong(Long.MAX_VALUE);
 		dockerScanner.getNeoRxClient()
 				.execCypher("merge (x:DockerTask {taskId:{taskId}}) set x+={props}, x.updateTs=timestamp() return x",
@@ -403,7 +445,7 @@ public class SwarmScanner {
 		return timestamp.get();
 	}
 
-	public void scanTasksForSwarm(String swarmClusterId) {
+	private void scanTasksForSwarm(String swarmClusterId) {
 
 		logger.info("scanning tasks for swarm: {}", swarmClusterId);
 

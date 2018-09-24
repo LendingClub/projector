@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.lendingclub.mercator.aws;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * A marker interface to indicate a scan is either slow, or slow-changing and
  * should be scanned at a reduced rate.
@@ -22,15 +24,11 @@ package org.lendingclub.mercator.aws;
 public interface AWSSlowScan {
 
 	/**
-	 * Returns the ratio (fraction) of the number of times this scanner should run
-	 * compared to a normal scan. For example, the default value of 1/5 means the
-	 * scanner should run once every 5 minutes (if a normal scan runs every 1
-	 * minute.)
+	 * Returns the minimum interval between scans, in milliseconds.
 	 * 
 	 * @See {@link MultiAccountRegionEntityScanner}
 	 */
-	public default int[] getSlowScanRatio() {
-		return new int[] { 1, 5 };
+	public default long getMinimumScanInterval() {
+		return TimeUnit.MINUTES.toMillis(10L);
 	}
-
 }

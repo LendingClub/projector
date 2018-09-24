@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ public class DockerScanner extends AbstractScanner {
 		try {
 			SwarmScanner ss = new SwarmScanner(this);
 			ss.scanService(service);
+			ss.scanTasksForService(service);
 		}
 		catch (RuntimeException e) {
 			maybeThrow(e);
@@ -90,7 +91,7 @@ public class DockerScanner extends AbstractScanner {
 	public void scan() {
 		
 		
-		WebTarget wt = SwarmScanner.extractWebTarget(getDockerClient());
+		WebTarget wt = DockerRestClient.extractWebTarget(getDockerClient());
 		JsonNode n = wt.path("/info").request().buildGet().invoke(JsonNode.class);
 		
 		if (n.path("Swarm").path("Cluster").isContainerNode()) {

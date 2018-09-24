@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.lendingclub.mercator.aws;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 
 import org.lendingclub.neorx.NeoRxClient;
@@ -35,32 +33,15 @@ import com.google.common.base.Strings;
 
 public class RDSInstanceScanner extends AWSScanner<AmazonRDSClient> {
 
-
-
-
 	public RDSInstanceScanner(AWSScannerBuilder builder) {
 		super(builder,AmazonRDSClient.class,"AwsRdsInstance");
-	
+		jsonConverter.withFlattenNestedObjects(true);
 	}
 
 	@Override
 	protected AmazonRDSClient createClient() {
 		return (AmazonRDSClient) builder.configure(AmazonRDSClientBuilder
 				.standard()).build();
-	}
-
-	@Override
-	public Optional<String> computeArn(JsonNode n) {
-		
-		String region = n.get(AWSScanner.AWS_REGION_ATTRIBUTE).asText(null);
-		String account = n.get(AccountScanner.ACCOUNT_ATTRIBUTE).asText(null);
-		String dbInstanceId = n.get("aws_dbinstanceIdentifier").asText(null);
-		
-		Preconditions.checkState(!Strings.isNullOrEmpty(region), "aws_region not set");
-		Preconditions.checkState(!Strings.isNullOrEmpty(account), "aws_account not set");
-		Preconditions.checkState(!Strings.isNullOrEmpty(dbInstanceId), "aws_dbinstanceIdentifier not set");
-
-		return Optional.of(String.format("arn:aws:rds:%s:%s:db:%s", region, account, dbInstanceId));
 	}
 
 	@Override
@@ -74,9 +55,9 @@ public class RDSInstanceScanner extends AWSScanner<AmazonRDSClient> {
 				NeoRxClient neoRx = getNeoRxClient();
 				Preconditions.checkNotNull(neoRx);
 				
-				String rdsArn = n.path("aws_arn").asText();
+				String rdsArn = instance.getDBInstanceArn();
 				
-				String cypher = "merge (x:AwsRdsInstance {aws_arn:{aws_arn}}) set x+={props} set x.updateTs=timestamp()";
+				String cypher = "merge (x:AwsRdsInstance {aws_arn:{aws_arn}}) set x+={props} set x.updateTs=timestamp() return x";
 				neoRx.execCypher(cypher, "aws_arn", rdsArn, "props",n).forEach(r->{
 					gc.MERGE_ACTION.accept(r);
 					getShadowAttributeRemover().removeTagAttributes("AwsRdsInstance", n, r);

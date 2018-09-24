@@ -17,6 +17,7 @@ dependencies {
     compile "org.slf4j:slf4j-api:${SLF4J_VERSION}"
     compile "com.fasterxml.jackson.core:jackson-databind:${JACKSON_VERSION}"
     compile "com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:${JACKSON_VERSION}"
+    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${JACKSON_VERSION}"
     compile "com.google.guava:guava:${GUAVA_VERSION}"
     compile "org.lendingclub.neorx:neorx:${NEORX_VERSION}"
     compile "io.macgyver.okrest3:okrest:${OKREST3_VERSION}"

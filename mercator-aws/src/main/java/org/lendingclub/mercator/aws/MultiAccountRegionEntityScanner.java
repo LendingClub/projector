@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,13 @@
 package org.lendingclub.mercator.aws;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.lendingclub.mercator.core.Scanner;
 import org.slf4j.Logger;
@@ -50,16 +53,18 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 
 	private static class TargetBuilder extends AWSScannerBuilder {
 		private static final Logger logger = LoggerFactory.getLogger(MultiAccountRegionEntityScanner.class);
-		private int scanNumber;
-		private Map<Class<? extends AWSScanner<?>>, Double> rateLimits;
-		private Map<Class<? extends AWSSlowScan>, int[]> slowScanRatios;
+		private Map<Class<?>, Double> rateLimits;
 		private Class<?> scannerTypeUnderConstruction;
+		private Map<String, Long> lastScanTimes;
+		private long now;
+		private Map<Class<?>, Long> slowScanIntervals;
 
-		public TargetBuilder(Builder builder, int scanNumber) {
+		public TargetBuilder(Builder builder, Map<String, Long> lastScanTimes) {
 			super(builder);
 			this.rateLimits = builder.rateLimits;
-			this.slowScanRatios = builder.slowScanRatios;
-			this.scanNumber = scanNumber;
+			this.slowScanIntervals = builder.slowScanIntervals;
+			this.lastScanTimes = lastScanTimes;
+			this.now = System.currentTimeMillis();
 		}
 
 		@Override
@@ -87,14 +92,14 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 			}
 			if (scanner instanceof AWSSlowScan) {
 				AWSSlowScan slowScanner = (AWSSlowScan) scanner;
-				int[] ratio = slowScanRatios.get(slowScanner.getClass());
-				if (ratio == null) {
-					ratio = slowScanner.getSlowScanRatio();
-				}
-				if (((ratio[0] * scanNumber) % ratio[1]) != 0) {
+				String key = clazz.getName() + ":" + scanner.getRegion() + ":" + scanner.getAccountId();
+				long lastScanTime = lastScanTimes.getOrDefault(key, 0L);
+				long minimumScanInterval = slowScanIntervals.getOrDefault(clazz, slowScanner.getMinimumScanInterval());
+				if ((now - lastScanTime) < minimumScanInterval) {
 					return null;
 				}
-				logger.info("including slow " + scanner.getClass().getSimpleName() + " on this iteration");
+				logger.info("including slow scan " + key);
+				lastScanTimes.put(key, now);
 			}
 			return scanner;
 		}
@@ -105,9 +110,9 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 
 		List<Target> targets = new ArrayList<>();
 		Regions globalRegion;
-		List<Class<? extends AWSScanner<?>>> disabledScanTypes = new ArrayList<>();
-		Map<Class<? extends AWSScanner<?>>, Double> rateLimits = new HashMap<>();
-		Map<Class<? extends AWSSlowScan>, int[]> slowScanRatios = new HashMap<>();
+		Set<Class<?>> disabledScanTypes = new HashSet<>();
+		Map<Class<?>, Double> rateLimits = new HashMap<>();
+		Map<Class<?>, Long> slowScanIntervals = new HashMap<>();
 
 		public Builder() {
 		}
@@ -125,30 +130,31 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 			return this;
 		}
 
-		public Builder withRateLimit(Class<? extends AWSScanner<?>> scannerType, double rateLimitPerSecond) {
-			rateLimits.put(scannerType, rateLimitPerSecond);
+		public Builder withDisabledScanTypes(Collection<Class<?>> scannerTypes) {
+			disabledScanTypes.clear();
+			if (scannerTypes != null) {
+				disabledScanTypes.addAll(scannerTypes);
+			}
 			return this;
 		}
 
-		public Builder withSlowScanRatio(Class<? extends AWSSlowScan> scannerType, int[] scanRatio) {
-			slowScanRatios.put(scannerType, scanRatio);
+		public Builder withRateLimits(Map<Class<?>, ? extends Number> rateLimits) {
+			this.rateLimits.clear();
+			if (rateLimits != null) {
+				rateLimits.forEach((k, v) -> this.rateLimits.put(k, v.doubleValue()));
+			}
 			return this;
 		}
 		
-		public Builder defaultSlowScanRatios() {
-			slowScanRatios.clear();
+
+		public Builder withSlowScanIntervals(Map<Class<?>, Number> slowScanIntervals) {
+			this.slowScanIntervals.clear();
+			if (slowScanIntervals != null) {
+				slowScanIntervals.forEach((k,v) -> this.slowScanIntervals.put(k, v.longValue()));
+			}
 			return this;
 		}
 
-		public Builder defaultRateLimits() {
-			rateLimits.clear();
-			return this;
-		}
-
-		public Builder defaultDisabledScanTypes() {
-			disabledScanTypes.clear();
-			return this;
-		}
 
 		@SuppressWarnings({ "rawtypes" })
 		@Override
@@ -161,9 +167,10 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 			return (MultiAccountRegionEntityScanner) super.build(MultiAccountRegionEntityScanner.class);
 		}
 
-		AWSScannerBuilder createTargetBuilder(int scanNumber, Target target) {
-			AWSScannerBuilder builder = new TargetBuilder(this, scanNumber).withCredentials(target.credentialsProvider)
-					.withRegion(target.region).withIncludeGlobalResources(globalRegion == target.region);
+		AWSScannerBuilder createTargetBuilder(Target target, Map<String, Long> lastScanTimes) {
+			AWSScannerBuilder builder = new TargetBuilder(this, lastScanTimes)
+					.withCredentials(target.credentialsProvider).withRegion(target.region)
+					.withIncludeGlobalResources(globalRegion == target.region);
 			if (!Strings.isNullOrEmpty(target.accountId)) {
 				builder.withAccountId(target.accountId);
 			}
@@ -177,7 +184,7 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 
 	}
 
-	private int scanNumber;
+	private Map<String, Long> lastScanTimes = new HashMap<>();
 
 	public MultiAccountRegionEntityScanner(AWSScannerBuilder builder) {
 		super(builder);
@@ -202,14 +209,13 @@ public class MultiAccountRegionEntityScanner extends AWSParallelScannerGroup {
 		Builder builder = (Builder) this.builder;
 		List<Scanner> result = new ArrayList<>();
 		for (Target target : ((Builder) builder).targets) {
-			AllEntityScanner regionScanner = builder.createTargetBuilder(scanNumber, target)
+			AllEntityScanner regionScanner = builder.createTargetBuilder(target, lastScanTimes)
 					.build(AllEntityScanner.class);
-			for (Class<? extends AWSScanner<?>> disabledScanType : builder.disabledScanTypes) {
+			for (Class<?> disabledScanType : builder.disabledScanTypes) {
 				regionScanner.removeScannerType(disabledScanType);
 			}
 			result.add(regionScanner);
 		}
-		scanNumber += 1;
 		return result;
 	}
 

@@ -14,9 +14,10 @@ repositories {
 dependencies {
 
 	compile project(':mercator-core')
-    compile 'io.fabric8:kubernetes-client:3.1.0'
+    compile "io.fabric8:kubernetes-client:${KUBERNETES_CLIENT_VERSION}"
     
     testCompile project(':mercator-test')
+    testCompile "io.fabric8:kubernetes-server-mock:${KUBERNETES_CLIENT_VERSION}"
     testCompile "ch.qos.logback:logback-classic:${LOGBACK_VERSION}"
     testCompile 'org.mockito:mockito-core:2.7.0'
 }

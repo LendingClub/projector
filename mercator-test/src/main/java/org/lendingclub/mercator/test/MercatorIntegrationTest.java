@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ public class MercatorIntegrationTest {
 	@After
 	public void deleteMercatorTestData() {
 		if (neo4jAvailable!=null && neo4jAvailable.booleanValue()) {
-			projector.getNeoRxClient().execCypher("match (a) where exists(a.junitData) detach delete a");
+			projector.getNeoRxClient().execCypher("match (a:JUnitTestNode) detach delete a");
 		}
 	}
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ public class JsonConverter {
 	}
 
 	public ObjectNode toJson(Object x) {
-		ObjectNode n = mapper.valueToTree(x);
+		ObjectNode n = x instanceof ObjectNode ? (ObjectNode) x : mapper.valueToTree(x);
 
 		ObjectNode r = mapper.createObjectNode();
 

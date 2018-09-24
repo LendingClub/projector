@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,9 +50,9 @@ public class SubnetScanner extends AbstractEC2NetworkInfrastructureScanner {
 		result.getSubnets().forEach(it -> {
 			try {
 				ObjectNode n = convertAwsObject(it, getRegion());
+				n.put("cidrBlock", it.getCidrBlock());
 				
-				
-				String cypher = "MERGE (v:AwsSubnet {aws_arn:{aws_arn}}) set v+={props}, v.updateTs=timestamp() return v";
+				String cypher = "MERGE (v:AwsSubnet {aws_arn:{aws_arn}}) set v+={props}, v.updateTs=timestamp(), v:CidrBlock return v";
 				
 				NeoRxClient client = getNeoRxClient();
 				Preconditions.checkNotNull(client);

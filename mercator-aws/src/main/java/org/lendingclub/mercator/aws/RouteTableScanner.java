@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,10 +68,16 @@ public class RouteTableScanner extends AbstractEC2NetworkInfrastructureScanner {
 	}
 
 	private void updateRoutes(RouteTable rt, String arn) {
+		/*
+		 * TODO - consider switching this to a similar structure that the
+		 * SecurityGroupScanner produces; that is generate AwsRoute nodes, then
+		 * associate the route nodes to destination cidr blocks.
+		 */
 		Set<String> vpcEndpoints = new HashSet<>();
 		Set<String> vpnGateways = new HashSet<>();
 		Set<String> internetGateways = new HashSet<>();
 		Set<String> peeringConnections = new HashSet<>();
+		Set<String> cidrBlocks = new HashSet<>();
 		for (Route r : rt.getRoutes()) {
 			if (r.getState().equals("blackhole")) {
 				continue;
@@ -89,19 +95,25 @@ public class RouteTableScanner extends AbstractEC2NetworkInfrastructureScanner {
 			if (!Strings.isNullOrEmpty(r.getVpcPeeringConnectionId())) {
 				peeringConnections.add(r.getVpcPeeringConnectionId());
 			}
+			if (!Strings.isNullOrEmpty(r.getDestinationCidrBlock())) {
+				cidrBlocks.add(r.getDestinationCidrBlock());
+			}
 		}
-		routeTo(arn, vpcEndpoints, "AwsVpcEndpoint", "aws_vpcEndpointId");
-		routeTo(arn, vpnGateways, "AwsVpnGateway", "aws_vpnGatewayId");
-		routeTo(arn, internetGateways, "AwsInternetGateway", "aws_internetGatewayId");
-		routeTo(arn, peeringConnections, "AwsVpcPeeringConnection", "aws_vpcPeeringConnectionId");
+		routeTo(arn, vpcEndpoints, "AwsVpcEndpoint", "aws_vpcEndpointId", true);
+		routeTo(arn, vpnGateways, "AwsVpnGateway", "aws_vpnGatewayId", true);
+		routeTo(arn, internetGateways, "AwsInternetGateway", "aws_internetGatewayId", true);
+		routeTo(arn, peeringConnections, "AwsVpcPeeringConnection", "aws_vpcPeeringConnectionId", true);
+		routeTo(arn, cidrBlocks, "CidrBlock", "cidrBlock", false);
 	}
 
-	private void routeTo(String arn, Collection<String> ids, String targetLabel, String targetLinkAttribute) {
+	private void routeTo(String arn, Collection<String> ids, String targetLabel, String targetLinkAttribute,
+			boolean localRegion) {
 		if (!ids.isEmpty()) {
 			LinkageHelper linkage = newLinkageHelper().withFromArn(arn).withLinkLabel("ROUTES_TO")
-					.withMoreWhere("b.aws_region = {R}", "R", getRegion().getName())
-					.withTargetLabel(targetLabel).withTargetLinkAttribute(targetLinkAttribute)
-					.withTargetValues(ids);
+					.withTargetLabel(targetLabel).withTargetLinkAttribute(targetLinkAttribute).withTargetValues(ids);
+			if (localRegion) {
+				linkage.withMoreWhere("b.aws_region = {R}", "R", getRegion().getName());
+			}
 			linkage.execute();
 		}
 	}

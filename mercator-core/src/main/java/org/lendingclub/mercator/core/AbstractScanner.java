@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Lending Club, Inc.
+ * Copyright 2017-2018 LendingClub, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,6 @@ public abstract class AbstractScanner implements Scanner {
 			logger.info("rate limit {} calls/second", rateLimit);
 			this.rateLimiter = RateLimiter.create(rateLimit);
 		} else {
-			logger.info("rate limit {} calls/second", "unlimited");
 			this.rateLimiter = null;
 		}
 
